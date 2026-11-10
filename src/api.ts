@@ -259,7 +259,13 @@ export interface TaskState {
   attachment_name: string
   student_rules: string[]
   companion_connected: boolean
+  companion_last_seen: string | null
+  companion_live: boolean
   google_connected: boolean
+  google_account: string
+  google_doc_id: string
+  google_doc_name: string
+  google_last_synced_at: string | null
 }
 
 export interface SubmitResult {
@@ -321,6 +327,22 @@ export interface Overview {
   assignment: AssignmentBrief
   stage_counts: Record<string, number>
   rows: OverviewRow[]
+}
+
+export interface DashboardRow extends AssignmentBrief {
+  stage_counts: Record<string, number>
+  submitted_count: number
+  ungraded_count: number
+  signal_count: number
+}
+
+export interface Dashboard {
+  assignment_count: number
+  open_count: number
+  student_count: number
+  ungraded_count: number
+  signal_count: number
+  rows: DashboardRow[]
 }
 
 export interface StudentDetail {
@@ -405,6 +427,16 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
   } catch {
     data = text
   }
+  if (res.status === 401 && token && !opts.companionToken && !path.startsWith('/api/auth/')) {
+    // 토큰이 만료되었거나 무효다. 로그인 화면으로 보내고 그 이유를 남긴다.
+    setToken(null)
+    try {
+      sessionStorage.setItem('woowang_expired', '1')
+    } catch {
+      // 저장소를 못 쓰면 안내만 생략한다
+    }
+    window.dispatchEvent(new Event('woowang-auth-expired'))
+  }
   if (!res.ok) {
     let detail = `요청 실패 (${res.status})`
     if (data && typeof data === 'object' && 'detail' in data) {
@@ -437,6 +469,7 @@ export const api = {
   },
   prof: {
     list: () => request<AssignmentBrief[]>('GET', '/api/assignments'),
+    dashboard: () => request<Dashboard>('GET', '/api/assignments/dashboard'),
     create: (body: Partial<Assignment> & { title: string }) =>
       request<Assignment>('POST', '/api/assignments', { body }),
     get: (id: number) => request<Assignment>('GET', `/api/assignments/${id}`),
@@ -467,6 +500,8 @@ export const api = {
     setRules: (id: number, body: { target: RuleTarget; text: string }[]) =>
       request<Rule[]>('PUT', `/api/assignments/${id}/rules`, { body }),
     publish: (id: number) => request<Assignment>('POST', `/api/assignments/${id}/publish`),
+    publishCheck: (id: number) =>
+      request<{ ok: boolean; problems: string[]; status: string; join_code: string }>('GET', `/api/assignments/${id}/publish-check`),
     overview: (id: number) => request<Overview>('GET', `/api/assignments/${id}/overview`),
     student: (id: number, eid: number) => request<StudentDetail>('GET', `/api/assignments/${id}/students/${eid}`),
     setGrade: (id: number, eid: number, body: { score: number | null; comment: string }) =>

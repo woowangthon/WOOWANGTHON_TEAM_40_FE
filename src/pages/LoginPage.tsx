@@ -1,13 +1,25 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 
 import type { Role } from '../api'
 import { useAuth } from '../auth'
 
-export default function LoginPage() {
+function takeExpiredFlag(): boolean {
+  try {
+    const v = sessionStorage.getItem('woowang_expired') === '1'
+    sessionStorage.removeItem('woowang_expired')
+    return v
+  } catch {
+    return false
+  }
+}
+
+export default function LoginPage({ initialMode }: { initialMode?: 'login' | 'signup' }) {
   const { user, login, signup } = useAuth()
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [params] = useSearchParams()
+  const [mode, setMode] = useState<'login' | 'signup'>(initialMode ?? (params.get('mode') === 'signup' ? 'signup' : 'login'))
+  const [expired] = useState(takeExpiredFlag)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -34,6 +46,7 @@ export default function LoginPage() {
   return (
     <div className="login card">
       <h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
+      {expired && <div className="banner">로그인이 만료되어 다시 로그인한다. 작업 중이던 내용은 저장된 버전까지 남아 있다.</div>}
       <p className="muted small">교수와 학생 역할로 나뉜다. 교수는 과제를 만들고 학생은 과제 코드로 참여한다.</p>
       <form onSubmit={(e) => void submit(e)}>
         {mode === 'signup' && (

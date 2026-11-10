@@ -25,6 +25,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    // api.ts가 401을 받으면 이 이벤트를 보낸다. 사용자 상태를 비워 로그인 화면으로 보낸다.
+    const onExpired = () => setUser(null)
+    window.addEventListener('woowang-auth-expired', onExpired)
+    return () => window.removeEventListener('woowang-auth-expired', onExpired)
+  }, [])
+
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.auth.login({ email, password })
     setToken(res.token)

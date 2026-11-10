@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 
 import {
   api,
@@ -14,85 +13,18 @@ import {
 } from '../../api'
 import { DownloadButton } from '../../components/Files'
 
-type Notify = (kind: 'ok' | 'error', text: string) => void
+export type Notify = (kind: 'ok' | 'error', text: string) => void
 
 const ITEM_TYPES: ItemType[] = ['choice', 'short', 'fill', 'essay_short', 'essay_long']
 
-const TOOL_OPTIONS: Record<number, { value: string; label: string }[]> = {
+export const TOOL_OPTIONS: Record<number, { value: string; label: string }[]> = {
   0: [{ value: 'editor', label: '페이지 안 문서 편집기, 논술형 과제' }],
   1: [{ value: 'sql', label: 'Monaco 편집기와 sql.js, SQL 조회문 과제' }],
   2: [{ value: 'google_docs', label: 'Google 문서, API로 수정 이력을 받는다' }],
   3: [{ value: 'companion', label: '설치된 프로그램, 보조 프로그램이 창 캡처와 폴더 감시를 한다' }],
 }
 
-export default function AssignmentSetup() {
-  const { id } = useParams()
-  const aid = Number(id)
-  const [a, setA] = useState<Assignment | null>(null)
-  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
-
-  const reload = useCallback(
-    () => api.prof.get(aid).then(setA).catch((e: Error) => setMessage({ kind: 'error', text: e.message })),
-    [aid],
-  )
-  useEffect(() => {
-    void reload()
-  }, [reload])
-
-  const notify: Notify = (kind, text) => setMessage({ kind, text })
-
-  async function publish() {
-    try {
-      setA(await api.prof.publish(aid))
-      notify('ok', '과제를 공개했다. 학생은 참여 코드로 들어온다.')
-    } catch (e) {
-      notify('error', e instanceof Error ? e.message : '공개 실패')
-    }
-  }
-
-  if (!a) return <p className="muted">{message?.text ?? '불러오는 중'}</p>
-
-  return (
-    <div>
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <div>
-          <h1>과제 설정: {a.title}</h1>
-          <p className="muted small">
-            상태 {a.status === 'open' ? '공개 중' : '작성 중'} · 참여 코드 <code>{a.join_code}</code>
-          </p>
-        </div>
-        <div className="row">
-          <Link className="btn btn-secondary" to={`/prof/assignments/${aid}`}>
-            과제 현황
-          </Link>
-          {a.status !== 'open' && (
-            <button className="btn" onClick={() => void publish()}>
-              공개하기
-            </button>
-          )}
-        </div>
-      </div>
-      {message && <div className={`banner ${message.kind === 'ok' ? 'info' : ''}`}>{message.text}</div>}
-      <div className="section-nav">
-        {['1 기본 정보와 역량', '2 사전 사후 평가', '3 과제 문제', '4 학습 자료', '5 AI 응답 규칙', '6 도구 연동'].map((s, i) => (
-          <button key={s} onClick={() => document.getElementById(`sec${i + 1}`)?.scrollIntoView({ behavior: 'smooth' })}>
-            {s}
-          </button>
-        ))}
-      </div>
-      <BasicSection a={a} onSaved={setA} notify={notify} />
-      <CompetencySection a={a} onSaved={reload} notify={notify} />
-      <ItemsSection a={a} phase="pre" onSaved={reload} notify={notify} />
-      <ItemsSection a={a} phase="post" onSaved={reload} notify={notify} />
-      <TaskProblemSection a={a} onSaved={setA} notify={notify} />
-      <MaterialsSection a={a} onSaved={reload} notify={notify} />
-      <RulesSection a={a} onSaved={reload} notify={notify} />
-      <ToolSection a={a} onSaved={setA} notify={notify} />
-    </div>
-  )
-}
-
-function BasicSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
+export function BasicSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
   const [title, setTitle] = useState(a.title)
   const [subject, setSubject] = useState(a.subject)
   const [taskKind, setTaskKind] = useState(a.task_kind)
@@ -157,7 +89,7 @@ function emptyCompetency(): CompetencyInput {
   return { name: '', description: '', pass_score: 60, grading_criteria: '' }
 }
 
-function CompetencySection({ a, onSaved, notify }: { a: Assignment; onSaved: () => void; notify: Notify }) {
+export function CompetencySection({ a, onSaved, notify }: { a: Assignment; onSaved: () => void; notify: Notify }) {
   const [rows, setRows] = useState<CompetencyInput[]>(
     a.competencies.length ? a.competencies.map((c) => ({ ...c })) : [emptyCompetency()],
   )
@@ -246,7 +178,7 @@ function CompetencySection({ a, onSaved, notify }: { a: Assignment; onSaved: () 
   )
 }
 
-function ItemsSection({ a, phase, onSaved, notify }: { a: Assignment; phase: Phase; onSaved: () => void; notify: Notify }) {
+export function ItemsSection({ a, phase, onSaved, notify }: { a: Assignment; phase: Phase; onSaved: () => void; notify: Notify }) {
   const label = phase === 'pre' ? '사전평가' : '사후평가'
   const existing = a.items.filter((i) => i.phase === phase)
   const [rows, setRows] = useState<ItemInput[]>(existing.map((i) => ({ ...i })))
@@ -353,7 +285,7 @@ function ItemsSection({ a, phase, onSaved, notify }: { a: Assignment; phase: Pha
   )
 }
 
-function TaskProblemSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
+export function TaskProblemSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
   const [description, setDescription] = useState(a.description)
   const [deadline, setDeadline] = useState(toLocalInput(a.deadline))
   async function save() {
@@ -411,7 +343,7 @@ function TaskProblemSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a
   )
 }
 
-function MaterialsSection({ a, onSaved, notify }: { a: Assignment; onSaved: () => void; notify: Notify }) {
+export function MaterialsSection({ a, onSaved, notify }: { a: Assignment; onSaved: () => void; notify: Notify }) {
   const [busy, setBusy] = useState(false)
   async function upload(file: File | undefined) {
     if (!file) return
@@ -478,7 +410,7 @@ function MaterialsSection({ a, onSaved, notify }: { a: Assignment; onSaved: () =
   )
 }
 
-function RulesSection({ a, onSaved, notify }: { a: Assignment; onSaved: () => void; notify: Notify }) {
+export function RulesSection({ a, onSaved, notify }: { a: Assignment; onSaved: () => void; notify: Notify }) {
   const [rows, setRows] = useState<{ target: RuleTarget; text: string }[]>(a.rules.map((r) => ({ target: r.target, text: r.text })))
   useEffect(() => {
     setRows(a.rules.map((r) => ({ target: r.target, text: r.text })))
@@ -538,7 +470,7 @@ function RulesSection({ a, onSaved, notify }: { a: Assignment; onSaved: () => vo
   )
 }
 
-function ToolSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
+export function ToolSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
   const [slot, setSlot] = useState(a.tool_slot)
   const [tool, setTool] = useState(a.tool_name)
   const cfg = a.tool_config as Record<string, string>

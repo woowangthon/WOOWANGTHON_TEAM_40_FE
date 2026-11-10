@@ -25,6 +25,8 @@ export default function VersionList({
     <div>
       {[...versions].reverse().map((v) => {
         const snapshot = Boolean(v.meta?.snapshot)
+        // 자리 2에서 문서를 바꿔 가며 작업하면 버전마다 어느 문서에서 받은 것인지 보여 준다
+        const docName = typeof v.meta?.doc_name === 'string' ? v.meta.doc_name : ''
         const expanded = open[v.id] ?? (!compact && !snapshot)
         return (
           <div className="version" key={v.id}>
@@ -34,6 +36,7 @@ export default function VersionList({
                 <span className="chip">{SOURCE_LABEL[v.source] ?? v.source}</span>
                 <span className="chip">{v.kind === 'text' ? '텍스트' : v.kind === 'image' ? '이미지' : '파일'}</span>
                 {snapshot && <span className="chip chip-primary">자동 캡처</span>}
+                {docName && <span className="chip">문서 {docName}</span>}
                 <span className="muted small">{formatDate(v.created_at)}</span>
               </div>
               <div className="row">

@@ -1,12 +1,14 @@
 import Editor from '@monaco-editor/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import initSqlJs, { type Database, type QueryExecResult, type SqlJsStatic } from 'sql.js'
 
-import { api, formatDate, TOOL_LABEL, type ChatMessage, type Enrollment, type TaskState } from '../../api'
+import { api, formatDate, TOOL_LABEL, type Enrollment, type TaskState } from '../../api'
 import Chat from '../../components/Chat'
 import VersionList from '../../components/VersionList'
-import { openPip, pipSupported, type PipHandle } from '../../pip'
+import ExternalWork, { CompanionSetup, GoogleSetup } from './ExternalWork'
+
+// 자리 2와 자리 3은 기록이 페이지 밖에서 생기므로 이 간격으로 상태를 다시 받는다
+const EXTERNAL_POLL_MS = 15_000
 
 export default function TaskStage({ enrollment, onChanged }: { enrollment: Enrollment; onChanged: (notice?: string) => void }) {
   const eid = enrollment.id
@@ -16,10 +18,29 @@ export default function TaskStage({ enrollment, onChanged }: { enrollment: Enrol
   const [reason, setReason] = useState('')
   const [confirming, setConfirming] = useState(false)
 
+  // 대화를 보내는 중에 출발한 상태 요청은 새 대화가 빠져 있을 수 있으므로 버린다
+  const chatSeq = useRef(0)
+
   const reload = useCallback(() => api.stu.task(eid).then(setT).catch((e: Error) => setError(e.message)), [eid])
   useEffect(() => {
     void reload()
   }, [reload])
+
+  const external = t?.tool_name === 'google_docs' || t?.tool_name === 'companion'
+  const polling = external && Boolean(t?.attempt) && !t?.deadline_passed
+  useEffect(() => {
+    if (!polling) return
+    const timer = setInterval(() => {
+      const seq = chatSeq.current
+      api.stu
+        .task(eid)
+        .then((next) => {
+          if (seq === chatSeq.current) setT(next)
+        })
+        .catch(() => undefined)
+    }, EXTERNAL_POLL_MS)
+    return () => clearInterval(timer)
+  }, [polling, eid])
 
   if (error && !t) return <p className="error">{error}</p>
   if (!t) return <p className="muted">불러오는 중</p>
@@ -55,27 +76,14 @@ export default function TaskStage({ enrollment, onChanged }: { enrollment: Enrol
     }
   }
 
-  async function saveFile(file: File | undefined, source: string) {
-    if (!file) return
-    if (!reasonReady) {
-      setError('변경 이유를 한 줄 적어야 저장할 수 있다')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      setT(await api.stu.saveFileVersion(eid, file, reason.trim(), source))
-      setReason('')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '업로드 실패')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function send(message: string) {
-    const msgs = await api.stu.taskChat(eid, message)
-    setT((prev) => (prev ? { ...prev, messages: [...prev.messages, ...msgs] } : prev))
+    chatSeq.current += 1
+    try {
+      const msgs = await api.stu.taskChat(eid, message)
+      setT((prev) => (prev ? { ...prev, messages: [...prev.messages, ...msgs] } : prev))
+    } finally {
+      chatSeq.current += 1
+    }
   }
 
   async function submit() {
@@ -105,6 +113,26 @@ export default function TaskStage({ enrollment, onChanged }: { enrollment: Enrol
   }
 
   const chatDisabledReason = t.deadline_passed ? '마감이 지났다' : '진행 중인 시도가 없다'
+
+  // 자리 2는 문서가 지정되었을 때, 자리 3은 보조 프로그램이 서버에 접속한 적이 있을 때 작업이 시작된 것으로 본다
+  const externalStarted =
+    t.tool_name === 'google_docs' ? t.google_connected && Boolean(t.google_doc_id) : t.tool_name === 'companion' && t.companion_last_seen !== null
+  if (external && attempt && externalStarted) {
+    return (
+      <ExternalWork
+        t={t}
+        eid={eid}
+        attempt={attempt}
+        editable={editable}
+        busy={busy}
+        error={error}
+        chat={{ messages: t.messages, onSend: send, rules: t.student_rules, disabledReason: chatDisabledReason }}
+        onTask={setT}
+        onError={setError}
+        onSubmit={submit}
+      />
+    )
+  }
 
   return (
     <div>
@@ -161,46 +189,35 @@ export default function TaskStage({ enrollment, onChanged }: { enrollment: Enrol
 
       <div className="grid-side">
         <div>
-          <div className="card">
-            {editable && (
-              <div className="field">
-                <label>이번 버전의 변경 이유, 저장할 때 필수</label>
-                <input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="예: 부서별 평균을 구하려고 GROUP BY를 추가했다"
-                  maxLength={500}
+          {(!external || attempt) && (
+            <div className="card">
+              {editable && !external && (
+                <div className="field">
+                  <label>이번 버전의 변경 이유, 저장할 때 필수</label>
+                  <input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="예: 부서별 평균을 구하려고 GROUP BY를 추가했다"
+                    maxLength={500}
+                  />
+                </div>
+              )}
+              {t.tool_name === 'sql' && (
+                <SqlTool
+                  config={t.tool_config as { schema_sql?: string; seed_sql?: string }}
+                  initial={latestText}
+                  editable={editable}
+                  busy={busy}
+                  onSave={(code, meta) => saveText(code, 'embed', meta)}
                 />
-              </div>
-            )}
-            {t.tool_name === 'sql' && (
-              <SqlTool
-                config={t.tool_config as { schema_sql?: string; seed_sql?: string }}
-                initial={latestText}
-                editable={editable}
-                busy={busy}
-                onSave={(code, meta) => saveText(code, 'embed', meta)}
-              />
-            )}
-            {t.tool_name === 'editor' && (
-              <EditorTool initial={latestText} editable={editable} busy={busy} onSave={(text) => saveText(text, 'editor')} />
-            )}
-            {t.tool_name === 'google_docs' && (
-              <GoogleTool
-                t={t}
-                eid={eid}
-                editable={editable}
-                busy={busy}
-                onTask={setT}
-                onError={setError}
-                onUpload={(f) => saveFile(f, 'google')}
-                chat={{ messages: t.messages, onSend: send, rules: t.student_rules, disabled: !editable, disabledReason: chatDisabledReason }}
-              />
-            )}
-            {t.tool_name === 'companion' && (
-              <CompanionTool t={t} eid={eid} editable={editable} busy={busy} onUpload={(f) => saveFile(f, 'companion')} />
-            )}
-          </div>
+              )}
+              {t.tool_name === 'editor' && (
+                <EditorTool initial={latestText} editable={editable} busy={busy} onSave={(text) => saveText(text, 'editor')} />
+              )}
+              {t.tool_name === 'google_docs' && <GoogleSetup t={t} eid={eid} editable={editable} onTask={setT} onError={setError} />}
+              {t.tool_name === 'companion' && <CompanionSetup t={t} eid={eid} editable={editable} onTask={setT} onError={setError} />}
+            </div>
+          )}
           <div className="card">
             <h3>결과물 변경 이력{attempt ? `, 시도 ${attempt.attempt_no}` : ''}</h3>
             <p className="muted small">저장할 때마다 버전이 남고 변경 이유 한 줄이 함께 기록된다. 직전 버전과의 비교 화면은 준비 중이다.</p>
@@ -404,248 +421,6 @@ function SqlTool({
           </pre>
         </details>
       )}
-    </div>
-  )
-}
-
-interface ChatProps {
-  messages: ChatMessage[]
-  onSend: (m: string) => Promise<void>
-  rules: string[]
-  disabled: boolean
-  disabledReason: string
-}
-
-function GoogleTool({
-  t,
-  eid,
-  editable,
-  busy,
-  onTask,
-  onError,
-  onUpload,
-  chat,
-}: {
-  t: TaskState
-  eid: number
-  editable: boolean
-  busy: boolean
-  onTask: (t: TaskState) => void
-  onError: (m: string | null) => void
-  onUpload: (f: File | undefined) => Promise<void>
-  chat: ChatProps
-}) {
-  const [docUrl, setDocUrl] = useState('')
-  const [info, setInfo] = useState<string | null>(null)
-  const [working, setWorking] = useState(false)
-  const [pip, setPip] = useState<PipHandle | null>(null)
-  const connected = t.google_connected
-  const docId = (t.attempt?.versions ?? []).map((v) => v.meta?.doc_id as string | undefined).find(Boolean)
-
-  useEffect(() => {
-    if (!connected || !editable) return
-    const timer = setInterval(() => {
-      api.stu
-        .googleSync(eid)
-        .then((r) => {
-          onTask(r.task)
-          if (r.added > 0) setInfo(`수정 이력 ${r.added}개를 새 버전으로 받았다.`)
-        })
-        .catch(() => undefined)
-    }, 120_000)
-    return () => clearInterval(timer)
-  }, [connected, editable, eid, onTask])
-
-  useEffect(() => {
-    if (!pip) return
-    const close = () => setPip(null)
-    pip.win.addEventListener('pagehide', close)
-    return () => pip.win.removeEventListener('pagehide', close)
-  }, [pip])
-
-  async function connect() {
-    setWorking(true)
-    onError(null)
-    try {
-      const { url } = await api.stu.googleAuthUrl(eid)
-      window.location.href = url
-    } catch (e) {
-      onError(e instanceof Error ? e.message : '연결 실패')
-      setWorking(false)
-    }
-  }
-
-  async function setDoc() {
-    setWorking(true)
-    onError(null)
-    try {
-      const r = await api.stu.googleSetDoc(eid, docUrl)
-      onTask(r.task)
-      setInfo(`문서를 연결했고 수정 이력 ${r.added}개를 버전으로 받았다.`)
-      setDocUrl('')
-    } catch (e) {
-      onError(e instanceof Error ? e.message : '문서 지정 실패')
-    } finally {
-      setWorking(false)
-    }
-  }
-
-  async function sync() {
-    setWorking(true)
-    onError(null)
-    try {
-      const r = await api.stu.googleSync(eid)
-      onTask(r.task)
-      setInfo(r.added > 0 ? `수정 이력 ${r.added}개를 새 버전으로 받았다.` : '새 수정 이력이 없다.')
-    } catch (e) {
-      onError(e instanceof Error ? e.message : '동기화 실패')
-    } finally {
-      setWorking(false)
-    }
-  }
-
-  async function popout() {
-    if (pip) {
-      pip.win.close()
-      setPip(null)
-      return
-    }
-    if (pipSupported()) {
-      try {
-        const handle = await openPip()
-        if (handle) {
-          setPip(handle)
-          return
-        }
-      } catch {
-        // 사용자가 거부했거나 지원하지 않으면 별도 창으로 간다
-      }
-    }
-    window.open(`/stu/enrollments/${eid}/chat`, 'ai-panel', 'width=440,height=680')
-  }
-
-  return (
-    <div>
-      <h3>Google 문서</h3>
-      <p className="small">
-        Google 계정을 연결하고 문서 주소를 지정하면 서버가 Google Drive API의 수정 이력을 받아 버전으로 저장한다. 학습 AI는 아래 버튼으로 문서
-        탭 위에 작은 창으로 띄운다.
-      </p>
-      <div className="row" style={{ marginBottom: 8 }}>
-        <span className={`chip ${connected ? 'chip-ok' : ''}`}>{connected ? 'Google 계정 연결됨' : 'Google 계정 연결 안 됨'}</span>
-        {!connected ? (
-          <button className="btn btn-secondary btn-sm" onClick={() => void connect()} disabled={!editable || working}>
-            Google 계정 연결
-          </button>
-        ) : (
-          <>
-            <button className="btn btn-secondary btn-sm" onClick={() => void sync()} disabled={!editable || working}>
-              지금 동기화
-            </button>
-            {docId && (
-              <a className="btn btn-ghost btn-sm" href={`https://docs.google.com/document/d/${docId}/edit`} target="_blank" rel="noreferrer">
-                문서 열기
-              </a>
-            )}
-          </>
-        )}
-        <button className="btn btn-sm" onClick={() => void popout()}>
-          {pip ? 'AI 창 닫기' : '문서 탭 위에 AI 창 띄우기'}
-        </button>
-      </div>
-      {connected && (
-        <div className="row" style={{ marginBottom: 8 }}>
-          <input
-            value={docUrl}
-            onChange={(e) => setDocUrl(e.target.value)}
-            placeholder="https://docs.google.com/document/d/문서ID/edit"
-            style={{ flex: 1 }}
-            disabled={!editable || working}
-          />
-          <button className="btn btn-sm" onClick={() => void setDoc()} disabled={!editable || working || !docUrl.trim()}>
-            문서 지정
-          </button>
-        </div>
-      )}
-      {info && <p className="small ok">{info}</p>}
-      <div className="field" style={{ marginTop: 10 }}>
-        <label>보조 경로, 문서를 파일로 내려받아 올리면 버전이 남는다</label>
-        <input type="file" onChange={(e) => void onUpload(e.target.files?.[0])} disabled={!editable || busy} />
-      </div>
-      {pip &&
-        createPortal(
-          <div className="card" style={{ padding: 8, margin: 0 }}>
-            <Chat
-              title="학습 AI, 과제 단계"
-              messages={chat.messages}
-              onSend={chat.onSend}
-              rules={chat.rules}
-              disabled={chat.disabled}
-              disabledReason={chat.disabledReason}
-            />
-          </div>,
-          pip.container,
-        )}
-    </div>
-  )
-}
-
-function CompanionTool({
-  t,
-  eid,
-  editable,
-  busy,
-  onUpload,
-}: {
-  t: TaskState
-  eid: number
-  editable: boolean
-  busy: boolean
-  onUpload: (f: File | undefined) => Promise<void>
-}) {
-  const [token, setToken] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  const cfg = t.tool_config as { program?: string; extensions?: string }
-  async function issue() {
-    try {
-      setToken((await api.stu.companionToken(eid)).token)
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '토큰 발급 실패')
-    }
-  }
-  return (
-    <div>
-      <h3>{cfg.program ?? '설치된 프로그램'}과 보조 프로그램</h3>
-      <p className="small">
-        보조 프로그램이 {cfg.program ?? '프로그램'} 창을 캡처하고 저장 폴더에 {cfg.extensions ?? '결과물'} 파일이 저장될 때마다 버전을 올리며 학습
-        AI 창을 항상 위에 띄운다. 브라우저를 닫아도 기록이 이어진다.
-      </p>
-      <ol className="small" style={{ paddingLeft: 18 }}>
-        <li>
-          <a href="/downloads/companion.exe">보조 프로그램 내려받기</a>, 서명이 없어 Windows 경고가 뜰 수 있다
-        </li>
-        <li>아래 연결 토큰을 발급해 프로그램에 붙여 넣는다</li>
-        <li>프로그램에서 캡처 범위 동의를 읽고 저장 폴더를 고르면 기록이 시작된다</li>
-      </ol>
-      <div className="row">
-        <button className="btn btn-secondary btn-sm" onClick={() => void issue()} disabled={!editable}>
-          연결 토큰 발급
-        </button>
-        <span className={`chip ${t.companion_connected ? 'chip-ok' : ''}`}>{t.companion_connected ? '보조 프로그램 연결됨' : '연결 안 됨'}</span>
-      </div>
-      {token && (
-        <div className="banner info" style={{ marginTop: 8 }}>
-          <code style={{ userSelect: 'all' }}>{token}</code>
-          <p className="muted small" style={{ margin: '4px 0 0' }}>
-            이 토큰은 이 과제의 기록에만 쓰인다. 다른 사람에게 주지 않는다.
-          </p>
-        </div>
-      )}
-      {err && <p className="error small">{err}</p>}
-      <div className="field" style={{ marginTop: 10 }}>
-        <label>직접 파일 올리기, 보조 프로그램을 쓸 수 없을 때</label>
-        <input type="file" onChange={(e) => void onUpload(e.target.files?.[0])} disabled={!editable || busy} />
-      </div>
     </div>
   )
 }
