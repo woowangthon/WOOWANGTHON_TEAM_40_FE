@@ -455,7 +455,7 @@ interface RequestOptions {
   companionToken?: string
 }
 
-async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+export async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {}
   const token = getToken()
   if (opts.companionToken) headers['X-Companion-Token'] = opts.companionToken
@@ -652,6 +652,7 @@ export const MODE_LABEL: Record<string, string> = {
 export const TOOL_LABEL: Record<string, string> = {
   editor: '페이지 안 문서 편집기',
   sql: 'Monaco 편집기와 sql.js',
+  workspace: '작업공간, 코드와 보고서',
   google_docs: 'Google 문서',
   companion: '설치형 프로그램과 보조 프로그램',
 }

@@ -8,6 +8,7 @@ const SOURCE_LABEL: Record<string, string> = {
   embed: '페이지 안 웹 도구',
   google: 'Google 문서 API',
   companion: '보조 프로그램',
+  workspace: '작업공간',
 }
 
 export default function VersionList({

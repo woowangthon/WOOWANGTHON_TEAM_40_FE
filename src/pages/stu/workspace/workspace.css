@@ -1,0 +1,1033 @@
+/* 자리 4 작업공간. 색은 design.css 맨 위의 변수만 쓴다. 학습 단계(.learn)와 같은 3단 구성이다. */
+
+.ws {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
+  height: calc(100vh - 52px);
+  min-height: 520px;
+}
+
+.ws svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.ws-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.ws-ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-small {
+  font-size: 12px;
+}
+
+.ws-pad {
+  padding: 14px 16px;
+}
+
+.ws-alert {
+  color: var(--alert);
+}
+
+.ws-plus {
+  color: var(--text-2);
+}
+
+.ws-minus {
+  color: var(--alert);
+}
+
+.ws-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.ws-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.ws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.ws-code {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  background: var(--bg-2);
+  font: 12.5px/1.55 var(--mono);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+/* ───── 왼쪽: 과제 설명, 파일 ───── */
+.ws-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-side);
+}
+
+.ws-brief {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 12px 0;
+  padding: 0 10px;
+  height: 36px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r1);
+  background: var(--field);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ws-brief:hover {
+  background: var(--bg-hover);
+}
+
+.ws-brief-text {
+  margin: 8px 12px 0;
+  max-height: 220px;
+  overflow-y: auto;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.ws-tree {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 8px 8px;
+}
+
+.ws-side-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 4px 0 8px;
+}
+
+.ws-side-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ws-side-head .btn.icon {
+  width: 28px;
+  height: 28px;
+}
+
+.ws-menu {
+  margin: 4px 4px 8px;
+  padding: 4px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r2);
+  background: var(--field);
+}
+
+.ws-menu button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r1);
+  background: transparent;
+  cursor: pointer;
+}
+
+.ws-menu button:hover {
+  background: var(--bg-hover);
+}
+
+.ws-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.ws-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding-right: 6px;
+  border-radius: var(--r1);
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ws-row:hover {
+  background: var(--side-hover);
+  color: var(--text);
+}
+
+.ws-row.active {
+  background: var(--side-active);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ws-row.folder {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ws-row .ws-caret {
+  width: 13px;
+  height: 13px;
+  margin-right: -2px;
+  color: var(--text-3);
+}
+
+.ws-row .ws-tag {
+  margin-left: 0;
+}
+
+.ws-muted-icon {
+  color: var(--text-3);
+}
+
+.ws-row-actions {
+  display: none;
+  gap: 1px;
+}
+
+.ws-row:hover .ws-row-actions,
+.ws-row:focus-within .ws-row-actions {
+  display: flex;
+}
+
+.ws-row-actions button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--r1);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.ws-row-actions button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ws-row-actions svg {
+  width: 13px;
+  height: 13px;
+}
+
+.ws-tree-input {
+  padding: 2px 6px 6px;
+}
+
+.ws-tree-input > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-2);
+}
+
+.ws-tree-input .input {
+  height: 28px;
+  font-size: 13px;
+}
+
+.ws-tree-input small {
+  display: block;
+  margin: 4px 0 0 22px;
+  font-size: 11px;
+}
+
+.ws-record {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* ───── 가운데: 탭, 편집기, 실행 ───── */
+.ws-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.ws-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 12px 0 0;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.ws-tabs {
+  display: flex;
+  align-self: stretch;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.ws-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 0 10px 0 14px;
+  border-right: 1px solid var(--line);
+  color: var(--text-2);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ws-tab:hover {
+  color: var(--text);
+}
+
+.ws-tab.active {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ws-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--text);
+}
+
+.ws-tab-x {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r1);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.ws-tab-x:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ws-tab-x svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ws-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.ws-code-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ws-editor {
+  flex: 1 1 60%;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ws-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.ws-lang {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ws-monaco {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 수정안을 검토하는 동안에는 비교 화면에 자리를 더 준다 */
+.ws-code-area:has(.ws-proposal) .ws-editor {
+  flex-basis: 75%;
+}
+
+.ws-code-area:has(.ws-proposal) .ws-output {
+  flex-basis: 25%;
+}
+
+/* AI 수정안 검토 */
+.ws-proposal {
+  margin: 12px 16px 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r2);
+  animation: rise 0.2s var(--ease) both;
+  flex: none;
+}
+
+.ws-proposal-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.ws-proposal-head svg {
+  color: var(--accent-ink);
+}
+
+.ws-proposal-prompt {
+  margin-bottom: 4px;
+}
+
+.ws-draft {
+  height: auto;
+  margin-top: 8px;
+  padding: 8px 10px;
+  font: 13px/1.5 var(--mono);
+}
+
+.ws-proposal-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* 실행 결과 */
+.ws-output {
+  flex: 1 1 40%;
+  min-height: 160px;
+  max-height: 45%;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.ws-output.closed {
+  flex: none;
+  min-height: 0;
+}
+
+.ws-output-tabs {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 40px;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.ws-output-tabs .tab {
+  height: 40px;
+  gap: 6px;
+}
+
+.ws-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--alert);
+  color: var(--on-accent);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.ws-output-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ws-console {
+  margin: 0;
+  font: 13px/1.6 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ws-console + .ws-console {
+  margin-top: 6px;
+}
+
+.ws-stdin {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  font: 13px/1.6 var(--mono);
+  resize: none;
+  outline: none;
+}
+
+.ws-ask {
+  margin-top: 8px;
+  padding-left: 0;
+  color: var(--accent-ink);
+}
+
+.ws-test-sum {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ws-test-sum strong {
+  font-size: 15px;
+}
+
+.ws-tests {
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  overflow: hidden;
+}
+
+.ws-tests > div + div {
+  border-top: 1px solid var(--line);
+}
+
+.ws-test {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ws-test:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.ws-test.fail:hover {
+  background: var(--bg-hover);
+}
+
+.ws-test-detail {
+  padding: 4px 12px 12px 38px;
+}
+
+.ws-test-detail dl,
+.ws-dl {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+
+.ws-test-detail dt,
+.ws-dl dt {
+  color: var(--text-3);
+}
+
+.ws-test-detail dd {
+  font: 12.5px/1.55 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 보고서 */
+.ws-doc {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-2);
+}
+
+.ws-doc-frame {
+  flex: 1;
+  min-height: 0;
+}
+
+.ws-doc-frame > div,
+.ws-doc-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.ws-doc-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* ───── 오른쪽: AI ───── */
+.ws-ai {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--bg-side);
+}
+
+.ws-ai .chat-head {
+  gap: 8px;
+  padding: 0 16px;
+  flex: none;
+}
+
+.ws-ai-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: 16px;
+}
+
+.ws-ai-note {
+  margin: 0;
+}
+
+.ws-ai .msg {
+  overflow-wrap: anywhere;
+}
+
+.ws-ai .msg.me {
+  background: var(--side-active);
+}
+
+.ws-ai .msg p + p {
+  margin-top: 6px;
+}
+
+.ws-ai .msg code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  font-size: 12.5px;
+}
+
+.ws-ctx {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.ws-ctx svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ws-sugg {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r2);
+  background: var(--bg);
+}
+
+.ws-sugg > div {
+  display: grid;
+}
+
+.ws-sugg .btn {
+  justify-self: start;
+}
+
+.ws-ai-alert {
+  padding: 0 16px;
+}
+
+.ws-ctx-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 16px 8px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r1);
+  background: var(--field);
+  font-size: 13px;
+}
+
+.ws-ctx-chip .btn.icon {
+  width: 26px;
+  height: 26px;
+}
+
+.ws-ai .composer {
+  width: calc(100% - 32px);
+  margin: 0 16px 6px;
+  background: var(--field);
+}
+
+.ws-ai-foot {
+  margin: 0 16px 12px;
+}
+
+/* ───── 붙여넣기 출처, 제출 확인 ───── */
+.ws-paste {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: grid;
+  gap: 10px;
+  width: 360px;
+  padding: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r2);
+  background: var(--paper);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
+  animation: rise 0.2s var(--ease) both;
+}
+
+.ws-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ws-chips .btn {
+  height: 28px;
+  font-size: 13px;
+}
+
+.ws-chips .btn.ws-on {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ws-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.35);
+}
+
+.ws-modal {
+  display: grid;
+  gap: 14px;
+  width: min(480px, 100%);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  background: var(--paper);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
+  animation: rise 0.2s var(--ease) both;
+}
+
+.ws-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ws-modal-head h2 {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ws-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ws-checks {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--alert);
+}
+
+/* ───── 수정 이력 ───── */
+.ws-history {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 52px);
+}
+
+.ws-history-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 0 16px 0 8px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.ws-history-title {
+  display: grid;
+  margin-left: 8px;
+}
+
+.ws-history-title,
+.ws-history-bar > .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.ws-history-bar .seg {
+  flex: none;
+}
+
+.ws-history-bar .seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.ws-history-bar .select.ws-file-select {
+  flex: none;
+  width: 180px;
+  height: 32px;
+}
+
+.ws-history-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+}
+
+.ws-timeline {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 8px;
+  border-right: 1px solid var(--line);
+  background: var(--bg-side);
+}
+
+.ws-commit {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: var(--r1);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ws-commit:hover {
+  background: var(--side-hover);
+}
+
+.ws-commit.active {
+  background: var(--side-active);
+}
+
+.ws-commit-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ws-kind {
+  flex: none;
+  align-self: start;
+  padding: 0 7px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.ws-kind.k-ai {
+  border-color: var(--src-ai);
+  color: var(--src-ai);
+}
+
+.ws-kind.k-paste {
+  border-color: var(--src-rule);
+  color: var(--src-rule);
+}
+
+.ws-kind.k-run {
+  border-color: var(--src-material);
+  color: var(--src-material);
+}
+
+.ws-detail {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ws-detail-col {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 32px 48px;
+}
+
+.ws-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ws-detail-title {
+  margin: 10px 0 4px;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.ws-prompt,
+.ws-summary {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r2);
+}
+
+.ws-prompt {
+  border-left: 2px solid var(--accent);
+}
+
+.ws-prompt > svg {
+  color: var(--accent-ink);
+  margin-top: 2px;
+}
+
+.ws-prompt .btn.quiet {
+  margin-top: 4px;
+  padding-left: 0;
+  color: var(--accent-ink);
+}
+
+.ws-summary > svg {
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.ws-dl {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.ws-diff-head {
+  margin-top: 24px;
+}
+
+.ws-diff-head h2 {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.ws .diff div,
+.ws-history .diff div {
+  grid-template-columns: 40px 1fr;
+}
+
+.ws-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ws-split .diff {
+  overflow-x: auto;
+}
+
+@media (max-width: 1180px) {
+  .ws {
+    grid-template-columns: 220px minmax(0, 1fr) 300px;
+  }
+}

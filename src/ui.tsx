@@ -50,6 +50,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   return <ThemeCtx.Provider value={{ theme, toggle }}>{children}</ThemeCtx.Provider>
 }
 
+/** 지금 테마. 편집기처럼 색을 직접 정하는 부품이 따라가게 한다 */
+export function useTheme(): Theme {
+  return useContext(ThemeCtx).theme
+}
+
 export function ThemeToggle() {
   const { theme, toggle } = useContext(ThemeCtx)
   return (

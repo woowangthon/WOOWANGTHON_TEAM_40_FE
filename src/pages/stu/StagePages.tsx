@@ -6,6 +6,7 @@ import { PageHead } from '../../ui'
 import { currentStagePath, stageOpen, useEnrollment } from './EnrollmentLayout'
 import LearningStage from './LearningStage'
 import TaskStage from './TaskStage'
+import WorkspaceStage from './workspace/WorkspaceStage'
 import TestStage from './TestStage'
 
 // 아직 열리지 않은 단계로 들어오면 현재 단계로 안내한다.
@@ -55,6 +56,20 @@ export function LearningPage() {
 export function TaskPage() {
   const { e, reload, setNotice } = useEnrollment()
   const navigate = useNavigate()
+  const onChanged = (notice?: string) => {
+    if (notice) setNotice(notice)
+    void reload().then((en) => {
+      if (en.stage === 'post' && e.stage === 'task') navigate(`/stu/enrollments/${e.id}/post`)
+    })
+  }
+  // 자리 4 작업공간은 학습 단계처럼 위쪽 바 아래를 꽉 채운다
+  if (e.assignment.tool_name === 'workspace') {
+    return (
+      <StageGate target="task">
+        <WorkspaceStage enrollment={e} onChanged={onChanged} />
+      </StageGate>
+    )
+  }
   return (
     <StageGate target="task">
       <div className="task-frame">
