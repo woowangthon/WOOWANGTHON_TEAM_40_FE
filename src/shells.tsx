@@ -8,7 +8,7 @@ import { api, type Assignment, type Dashboard, type EnrollmentBrief } from './ap
 import { useAuth } from './auth'
 import ErrorBoundary from './components/ErrorBoundary'
 import { APP_NAME, sectionDone, setupNav, statusNav, type NavItem } from './nav'
-import { Loading, Notice, ThemeToggle } from './ui'
+import { Loading, Logo, Notice, ThemeToggle } from './ui'
 
 const cls = ({ isActive }: { isActive: boolean }) => (isActive ? 'side-link active' : 'side-link')
 
@@ -102,7 +102,10 @@ export function ProfHomeShell() {
     <div className="shell">
       <aside className="side">
         <div className="side-head">
-          <span className="brand">{APP_NAME}</span>
+          <span className="brand">
+            <Logo size={20} />
+            {APP_NAME}
+          </span>
           <ThemeToggle />
         </div>
         <nav className="side-group" aria-label="과제">
@@ -286,7 +289,10 @@ export function StuHomeShell() {
     <div className="shell">
       <aside className="side">
         <div className="side-head">
-          <span className="brand">{APP_NAME}</span>
+          <span className="brand">
+            <Logo size={20} />
+            {APP_NAME}
+          </span>
           <ThemeToggle />
         </div>
         <nav className="side-group" aria-label="과제">
@@ -348,6 +354,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
     <div className="public">
       <header className="pub-top">
         <Link to="/" className="brand">
+          <Logo size={20} />
           {APP_NAME}
         </Link>
         <div className="inline">

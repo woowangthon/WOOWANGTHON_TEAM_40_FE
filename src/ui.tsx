@@ -64,6 +64,20 @@ export function ThemeToggle() {
   )
 }
 
+// 서비스 대표 이미지. 소문자 p 의 둥근 부분 안에 기록을 뜻하는 점을 둔다.
+// 다른 화면의 svg 규칙에 크기와 선 굵기가 바뀌지 않도록 값을 style 로 준다.
+export function Logo({ size = 20 }: { size?: number }) {
+  const line = { fill: 'none', stroke: '#fff', strokeWidth: 3.2 }
+  return (
+    <svg className="logo" viewBox="0 0 32 32" style={{ width: size, height: size, flex: 'none' }} aria-hidden="true">
+      <rect width="32" height="32" rx="8" style={{ fill: '#2563eb', stroke: 'none' }} />
+      <path d="M11 9v15.5" style={{ ...line, strokeLinecap: 'round' }} />
+      <circle cx="17.4" cy="14" r="5.6" style={line} />
+      <circle cx="17.4" cy="14" r="1.9" style={{ fill: '#fff', stroke: 'none' }} />
+    </svg>
+  )
+}
+
 // 색 상자 대신 점과 글자로 상태를 알린다.
 export function Status({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (

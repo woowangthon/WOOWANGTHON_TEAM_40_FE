@@ -20,7 +20,9 @@ import {
 import type { Assignment, Stage } from './api'
 import type { Tone } from './ui'
 
-export const APP_NAME = '학습 도우미'
+export const APP_NAME = 'prob.ai'
+// prob 을 풀어 쓴 말. 과정은 기록하고 AI 는 열어 둔다는 뜻이다
+export const APP_EXPANSION = 'Process Recorded, Open Book'
 
 export function homePath(role: 'professor' | 'student'): string {
   return role === 'professor' ? '/prof' : '/stu'

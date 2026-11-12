@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth'
 import { homePath } from './nav'
 import CompanionPanel from './pages/CompanionPanel'
+import Landing from './pages/Landing'
 import LoginPage from './pages/LoginPage'
 import NotFound from './pages/NotFound'
 import Privacy from './pages/Privacy'
@@ -25,11 +26,11 @@ import { Loading } from './ui'
 
 export { APP_NAME, homePath } from './nav'
 
-// 첫 주소. 로그인한 사람은 역할별 홈으로, 아니면 로그인으로 보낸다.
+// 첫 주소. 로그인한 사람은 역할별 홈으로 보내고, 아니면 소개 화면을 보여 준다.
 function HomeRedirect() {
   const { user, loading } = useAuth()
   if (loading) return <Loading />
-  return <Navigate to={user ? homePath(user.role) : '/login'} replace />
+  return user ? <Navigate to={homePath(user.role)} replace /> : <Landing />
 }
 
 function RequireRole({ role, children }: { role: 'professor' | 'student'; children: React.ReactNode }) {

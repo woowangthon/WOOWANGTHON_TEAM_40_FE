@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '../auth'
 import { APP_NAME, homePath } from '../nav'
-import { Loading, Notice } from '../ui'
+import { Loading, Logo, Notice } from '../ui'
 
 // 서버가 돌려보낸 실패 이유를 문장으로 바꾼다.
 const REASON: Record<string, string> = {
@@ -38,7 +38,10 @@ export default function SocialCallback() {
   return (
     <div className="auth">
       <div className="auth-box">
-        <span className="brand">{APP_NAME}</span>
+        <span className="brand">
+          <Logo size={20} />
+          {APP_NAME}
+        </span>
         <h1>소셜 로그인</h1>
         <Notice kind="error">{error}</Notice>
         <div className="inline">

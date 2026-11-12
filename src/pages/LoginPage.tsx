@@ -7,7 +7,8 @@ import githubDark from '../assets/github-dark.svg'
 import githubLight from '../assets/github.svg'
 import { useAuth } from '../auth'
 import { APP_NAME, homePath } from '../nav'
-import { Notice, ThemeToggle, vars } from '../ui'
+import { Logo, Notice, ThemeToggle, vars } from '../ui'
+import './login.css'
 
 function takeExpiredFlag(): boolean {
   try {
@@ -109,6 +110,16 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 'si
       .catch(() => setProviders([]))
   }, [])
 
+  // 소셜 로그인 화면으로 갔다가 뒤로 오면 브라우저가 떠나기 직전의 화면을 그대로 되살린다.
+  // 그때 버튼이 눌린 채 잠겨 있지 않도록 상태를 푼다.
+  useEffect(() => {
+    const unlock = (e: PageTransitionEvent) => {
+      if (e.persisted) setBusy(false)
+    }
+    window.addEventListener('pageshow', unlock)
+    return () => window.removeEventListener('pageshow', unlock)
+  }, [])
+
   if (user) return <Navigate to={returnPath(location.state, user.role)} replace />
 
   async function submit(e: FormEvent) {
@@ -141,108 +152,98 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 'si
     }
   }
 
+  const social_label = mode === 'login' ? '로 계속하기' : '로 가입하기'
   return (
-    <div className="login">
-      <div className="login-form">
-        <div className="auth-top">
-          <ThemeToggle />
-        </div>
-        <form className="auth-box" key={mode} onSubmit={(e) => void submit(e)}>
-          <span className="brand">{APP_NAME}</span>
-          <h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
+    <div className="au">
+      <Link to="/" className="au-brand">
+        <Logo size={26} />
+        {APP_NAME}
+      </Link>
+      <div className="au-main">
+        <form className="au-box" key={mode} onSubmit={(e) => void submit(e)}>
+          <h1>과정을 위한 AI</h1>
           {expired && <Notice>로그인이 만료되어 다시 로그인한다. 작업 중이던 내용은 저장된 버전까지 남아 있다.</Notice>}
 
           {mode === 'signup' && (
-            <>
-              <div className="field">
-                <label className="label" htmlFor="name">
-                  이름
-                </label>
-                <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoComplete="name" required />
-              </div>
-              <div className="field">
-                <label className="label" htmlFor="role">
-                  역할
-                </label>
-                <select id="role" className="select" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                  <option value="student">학생</option>
-                  <option value="professor">교수</option>
-                </select>
-              </div>
-            </>
-          )}
-          <div className="field">
-            <label className="label" htmlFor="email">
-              이메일
-            </label>
-            <input id="email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@school.ac.kr" autoComplete="email" required />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="pw">
-              비밀번호 8자 이상
-            </label>
-            <input
-              id="pw"
-              className="input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={8}
-              maxLength={72}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              required
-            />
-          </div>
-          {mode === 'signup' && (
-            <div className="field">
-              <label className="label" htmlFor="pw2">
-                비밀번호 확인
-              </label>
-              <input id="pw2" className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={8} maxLength={72} autoComplete="new-password" required />
+            <div className="au-role" role="group" aria-label="역할">
+              <button type="button" aria-pressed={role === 'student'} onClick={() => setRole('student')}>
+                학생
+              </button>
+              <button type="button" aria-pressed={role === 'professor'} onClick={() => setRole('professor')}>
+                교수
+              </button>
             </div>
           )}
+
+          {providers.includes('google') && (
+            <button type="button" className="au-social" disabled={busy} onClick={() => void social('google')}>
+              <GoogleMark />
+              Google{social_label}
+            </button>
+          )}
+          {providers.includes('github') && (
+            <button type="button" className="au-social" disabled={busy} onClick={() => void social('github')}>
+              <img className="only-light" src={githubLight} alt="" />
+              <img className="only-dark" src={githubDark} alt="" />
+              GitHub{social_label}
+            </button>
+          )}
+          {providers.length > 0 && <div className="au-or">또는</div>}
+
+          {mode === 'signup' && (
+            <input className="au-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoComplete="name" placeholder="이름 입력" aria-label="이름" required />
+          )}
+          <input className="au-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="이메일 입력" aria-label="이메일" required />
+          <input
+            className="au-input"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={8}
+            maxLength={72}
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            placeholder={mode === 'login' ? '비밀번호 입력' : '비밀번호 입력, 8자 이상'}
+            aria-label="비밀번호"
+            required
+          />
+          {mode === 'signup' && (
+            <input
+              className="au-input"
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              minLength={8}
+              maxLength={72}
+              autoComplete="new-password"
+              placeholder="비밀번호 다시 입력"
+              aria-label="비밀번호 확인"
+              required
+            />
+          )}
           {error && (
-            <p className="error-text" role="alert">
+            <p className="au-error" role="alert">
               {error}
             </p>
           )}
-          <button className="btn primary lg" type="submit" disabled={busy}>
-            {mode === 'login' ? '로그인' : '가입하고 시작'}
+          <button className="au-submit" type="submit" disabled={busy}>
+            {mode === 'login' ? '이메일로 로그인' : '이메일로 가입하기'}
           </button>
-          <p>
-            {mode === 'login' ? '계정이 없다면 ' : '이미 계정이 있다면 '}
-            <Link className="link" to={mode === 'login' ? '/signup' : '/login'} state={location.state}>
-              {mode === 'login' ? '회원가입' : '로그인'}
-            </Link>
-          </p>
 
-          {providers.length > 0 && (
-            <>
-              <div className="or">또는</div>
-              {providers.includes('google') && (
-                <button type="button" className="btn lg social google" disabled={busy} onClick={() => void social('google')}>
-                  <GoogleMark />
-                  {mode === 'login' ? 'Google 계정으로 로그인' : 'Google 계정으로 가입'}
-                </button>
-              )}
-              {providers.includes('github') && (
-                <button type="button" className="btn lg social" disabled={busy} onClick={() => void social('github')}>
-                  <img className="only-light" src={githubLight} alt="" />
-                  <img className="only-dark" src={githubDark} alt="" />
-                  {mode === 'login' ? 'GitHub 계정으로 로그인' : 'GitHub 계정으로 가입'}
-                </button>
-              )}
-            </>
-          )}
-
-          <p>
-            <Link className="link" to="/privacy">
-              개인정보와 기록 범위 안내
-            </Link>
-          </p>
+          <div className="au-links">
+            <span>
+              {mode === 'login' ? '계정이 없다면 ' : '이미 계정이 있다면 '}
+              <Link to={mode === 'login' ? '/signup' : '/login'} state={location.state}>
+                {mode === 'login' ? '회원가입' : '로그인'}
+              </Link>
+            </span>
+            <Link to="/privacy">개인정보와 기록 범위 안내</Link>
+          </div>
         </form>
       </div>
       <LoginPhotos />
+      <div className="au-theme">
+        <ThemeToggle />
+      </div>
     </div>
   )
 }
