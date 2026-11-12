@@ -494,7 +494,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
   return (
     <>
       {w.editable && (!envChoice || envPicking) && !history && (
-        <EnvSelect title={w.title} prof={prof} current={envChoice} onPick={pickEnv} onCancel={envChoice ? () => setEnvPicking(false) : undefined} />
+        <EnvSelect prof={prof} current={envChoice} onPick={pickEnv} onCancel={envChoice ? () => setEnvPicking(false) : undefined} />
       )}
       {history && (
         <HistoryView

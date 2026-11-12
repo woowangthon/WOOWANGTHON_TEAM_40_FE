@@ -1986,25 +1986,8 @@
   margin: 0 auto;
 }
 
-.ws-env-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--ws-soft-2);
-  color: var(--accent-ink);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.ws-env-eyebrow svg {
-  width: 13px;
-  height: 13px;
-}
-
 .ws-env h1 {
-  margin: 14px 0 6px;
+  margin: 0;
   font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.02em;

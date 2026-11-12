@@ -2,7 +2,7 @@
 // 교수 환경 값은 과제 설정(tool_config.environment)에 있으면 그것을, 없으면 아래 예시 값을 쓴다.
 // 실제 Docker 이미지 빌드와 실행 연결은 아직 없다.
 import { useEffect, useState } from 'react'
-import { ArrowRight, Check, Cpu, GraduationCap, Info, Lock, Monitor, Package, Settings2, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, Cpu, GraduationCap, Info, Lock, Monitor, Package, Settings2 } from 'lucide-react'
 import { Modal } from './dialogs'
 
 export type EnvSpec = {
@@ -104,13 +104,11 @@ function Spec({ env }: { env: EnvSpec }) {
 
 /** 과제 단계 첫 화면. 기본 환경과 교수 환경 중에서 고른다 */
 export function EnvSelect({
-  title,
   prof,
   current,
   onPick,
   onCancel,
 }: {
-  title: string
   prof: EnvSpec & { required: boolean }
   current: EnvChoice | null
   onPick: (key: EnvSpec['key']) => void
@@ -139,13 +137,7 @@ export function EnvSelect({
   return (
     <div className="ws-env">
       <div className="ws-env-col">
-        <span className="ws-env-eyebrow">
-          <Sparkles aria-hidden="true" /> 과제 시작 전에
-        </span>
-        <h1>실행 환경을 고른다</h1>
-        <p className="soft">
-          {title} 과제의 코드는 고른 환경에서 실행되고 테스트된다. 선택은 과정 기록에 남고, 작업 중에도 바꿀 수 있다.
-        </p>
+        <h1>실행환경 설정</h1>
 
         <div className="ws-env-cards" role="radiogroup" aria-label="실행 환경">
           {cards.map(([env, locked]) => {
@@ -182,7 +174,7 @@ export function EnvSelect({
 
         {!prof.required && (
           <p className="ws-env-hint">
-            <Info aria-hidden="true" /> 기본 환경을 골라도 제출할 때는 교수 환경에서 테스트를 한 번 더 돌린다.
+            <Info aria-hidden="true" /> 기본 환경을 골라도 제출할 때는 교수 환경에서 테스트를 한 번 더 돌립니다.
           </p>
         )}
 
