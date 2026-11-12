@@ -30,7 +30,7 @@ export const DEFAULT_ENV: EnvSpec = {
   apt: [],
   pip: [],
   flags: '-std=c++17 -O2',
-  note: '서비스가 정한 표준 환경이다. 대부분의 과제에 충분하다.',
+  note: '서비스 기본 환경',
 }
 
 const SAMPLE_PROFESSOR_ENV: EnvSpec & { required: boolean } = {
@@ -44,7 +44,7 @@ const SAMPLE_PROFESSOR_ENV: EnvSpec & { required: boolean } = {
   apt: ['build-essential', 'valgrind'],
   pip: ['numpy', 'matplotlib'],
   flags: '-std=c++17 -O2 -Wall',
-  note: '채점은 이 환경에서 한다. 실습실 컴퓨터와 같은 버전이다.',
+  note: '교수가 지정한 채점 환경',
 }
 
 /** 과제 설정에 교수 환경이 있으면 읽고, 없으면 예시를 쓴다. ?env=required 로 필수 모드를 미리 볼 수 있다 */
