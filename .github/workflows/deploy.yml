@@ -1,0 +1,24 @@
+name: Deploy
+
+# 프런트엔드가 main 에 들어가면 BE 저장소의 Deploy 를 실행한다.
+# 이미지 빌드와 동아리방 컴퓨터 배포는 BE 저장소의 deploy.yml 이 한다.
+# 다른 저장소의 워크플로는 기본 토큰으로 실행할 수 없어서 저장소 시크릿 BE_DEPLOY_TOKEN 을 쓴다.
+# BE 저장소에 Actions 쓰기 권한만 준 fine-grained 토큰을 넣는다.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run BE Deploy
+        env:
+          GH_TOKEN: ${{ secrets.BE_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::저장소 시크릿 BE_DEPLOY_TOKEN 이 없어 배포를 시작하지 못했다"
+            exit 1
+          fi
+          gh workflow run deploy.yml -R woowangthon/WOOWANGTHON_TEAM_40_BE --ref main
