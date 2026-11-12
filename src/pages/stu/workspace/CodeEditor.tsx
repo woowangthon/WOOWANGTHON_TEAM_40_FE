@@ -5,10 +5,10 @@ import { useTheme } from '../../../ui'
 import { applyProposal, type Proposal, type Selection, type WsFile } from './wsApi'
 
 const LANG = {
-  python: { name: 'Python 3.12', monaco: 'python' },
-  cpp: { name: 'C++17 · g++', monaco: 'cpp' },
-  java: { name: 'Java 21', monaco: 'java' },
-  '': { name: '텍스트', monaco: 'plaintext' },
+  python: { badge: 'Py', name: 'Python 3.12', monaco: 'python' },
+  cpp: { badge: 'C++', name: 'C++17 · g++', monaco: 'cpp' },
+  java: { badge: 'Java', name: 'Java 21', monaco: 'java' },
+  '': { badge: 'TXT', name: '텍스트', monaco: 'plaintext' },
 }
 
 export type PasteInfo = { text: string; lines: number; chars: number }
@@ -97,19 +97,21 @@ export function CodeEditor({
   return (
     <div className="ws-editor">
       <div className="ws-toolbar">
-        <span className="ws-lang">{lang.name}</span>
+        <span className="ws-lang" title="지원 언어: Python, C++, Java">
+          <b>{lang.badge}</b> {lang.name}
+        </span>
         {file.readonly && (
           <span className="ws-chip">
-            <Lock aria-hidden="true" /> 교수 제공 · 읽기 전용
+            <Lock aria-hidden="true" /> 교수 제공 파일 · 읽기 전용
           </span>
         )}
         <span className="ws-grow" />
         {runnable && (
           <>
-            <button className="btn" onClick={() => onRun('test')} disabled={running}>
+            <button className="ws-btn" onClick={() => onRun('test')} disabled={running}>
               <FlaskConical aria-hidden="true" /> 테스트
             </button>
-            <button className="btn primary" onClick={() => onRun('run')} disabled={running}>
+            <button className={running ? 'ws-btn dark running' : 'ws-btn dark'} onClick={() => onRun('run')} disabled={running}>
               <Play aria-hidden="true" /> {running ? '실행 중' : '실행'}
             </button>
           </>
@@ -118,20 +120,26 @@ export function CodeEditor({
 
       {proposal ? (
         <>
+          <div className="ws-review-bar">
+            <span>
+              <Sparkles aria-hidden="true" /> AI 수정안 <strong>검토 대기</strong> · {proposal.start_line}
+              {proposal.end_line > proposal.start_line ? `–${proposal.end_line}` : ''}번째 줄
+            </span>
+            <span className="ws-grow" />
+            <button className="ws-btn sm accent" onClick={onAccept} disabled={draft !== null}>
+              수락
+            </button>
+            <button className="ws-btn sm" onClick={onReject}>
+              거절
+            </button>
+          </div>
           <div className="ws-proposal">
-            <div className="ws-proposal-head">
-              <Sparkles aria-hidden="true" />
-              <strong>AI 수정안</strong>
-              <span className="soft">
-                {proposal.start_line}
-                {proposal.end_line > proposal.start_line ? `–${proposal.end_line}` : ''}번째 줄
-              </span>
+            <div className="ws-proposal-prompt">
+              <Sparkles aria-hidden="true" /> “{proposal.prompt}”
             </div>
-            <p className="ws-proposal-prompt">“{proposal.prompt}”</p>
-            {proposal.reason && <p className="soft">{proposal.reason}</p>}
             {draft !== null && (
               <textarea
-                className="textarea ws-draft"
+                className="ws-draft"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 rows={Math.min(12, Math.max(3, draft.split('\n').length + 1))}
@@ -139,28 +147,29 @@ export function CodeEditor({
                 autoFocus
               />
             )}
+            {proposal.reason && <div className="ws-proposal-reason">{proposal.reason}</div>}
             <div className="ws-proposal-actions">
               {draft === null ? (
                 <>
-                  <button className="btn primary" onClick={onAccept}>
+                  <button className="ws-btn sm ok" onClick={onAccept}>
                     <Check aria-hidden="true" /> 수락
                   </button>
-                  <button className="btn" onClick={onReject}>
+                  <button className="ws-btn sm" onClick={onReject}>
                     <X aria-hidden="true" /> 거절
                   </button>
-                  <button className="btn quiet" onClick={() => setDraft(proposal.new_text)}>
+                  <button className="ws-btn sm" onClick={() => setDraft(proposal.new_text)}>
                     <Code2 aria-hidden="true" /> 직접 수정
                   </button>
                 </>
               ) : (
                 <>
-                  <button className="btn primary" onClick={() => onApplyEdited(draft)}>
+                  <button className="ws-btn sm ok" onClick={() => onApplyEdited(draft)}>
                     <Check aria-hidden="true" /> 고친 내용 반영
                   </button>
-                  <button className="btn" onClick={() => setDraft(null)}>
+                  <button className="ws-btn sm" onClick={() => setDraft(null)}>
                     취소
                   </button>
-                  <span className="soft">고쳐서 반영하면 직접 수정으로 기록되고 AI 원안도 함께 남는다</span>
+                  <small>직접 고쳐서 반영하면 ‘직접’ 커밋으로 기록되고 AI 원안도 함께 남아요.</small>
                 </>
               )}
             </div>

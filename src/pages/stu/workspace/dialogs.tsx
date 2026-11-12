@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from 'react'
-import { ClipboardPaste, X } from 'lucide-react'
+import { ClipboardPaste, FileCode, FileText, X } from 'lucide-react'
 import { Notice } from '../../../ui'
 
 const PASTE_SOURCES = ['과제 명세 · 수업 자료', '내가 쓴 다른 파일', '외부 AI', '웹 검색', '기타']
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="ws-backdrop" onMouseDown={onClose}>
       <div className="ws-modal" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => e.stopPropagation()}>
@@ -120,6 +120,52 @@ export function CompleteDialog({
           {busy ? '제출 중' : '제출하고 사후평가로'}
         </button>
       </div>
+    </Modal>
+  )
+}
+
+export function BriefDialog({
+  subject,
+  title,
+  deadline,
+  description,
+  files,
+  testCount,
+  onClose,
+}: {
+  subject: string
+  title: string
+  deadline: string
+  description: string
+  files: { path: string; kind: 'code' | 'doc'; readonly: boolean; template: boolean }[]
+  testCount: number
+  onClose: () => void
+}) {
+  return (
+    <Modal title="과제 설명" onClose={onClose}>
+      <div>
+        <p className="soft ws-small">
+          {subject} · 마감 {deadline}
+        </p>
+        <h3 className="ws-brief-title">{title}</h3>
+      </div>
+      <p className="ws-brief-body">{description || '교수가 과제 설명을 쓰지 않았다'}</p>
+      <dl className="ws-dl">
+        <dt>기본 파일</dt>
+        <dd className="ws-brief-files">
+          {files
+            .filter((f) => f.template)
+            .map((f) => (
+              <span key={f.path}>
+                {f.kind === 'doc' ? <FileText aria-hidden="true" /> : <FileCode aria-hidden="true" />} {f.path}
+                {f.readonly && <em className="soft"> 읽기 전용</em>}
+              </span>
+            ))}
+        </dd>
+        <dt>테스트</dt>
+        <dd>{testCount > 0 ? `입출력 테스트 ${testCount}개` : '테스트 파일(test_*.py)의 함수로 채점한다'}</dd>
+      </dl>
+      <p className="ws-note">AI 사용은 감점이 아니다. 평가 항목은 공개하지만 세부 가중치는 공개하지 않는다.</p>
     </Modal>
   )
 }

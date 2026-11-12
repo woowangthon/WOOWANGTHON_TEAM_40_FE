@@ -277,32 +277,44 @@ export function FileTree({
 
   return (
     <div className="ws-tree">
-      <div className="ws-side-head">
-        <h2>파일</h2>
-        <span className="soft num">{files.length}</span>
+      <div className="ws-tree-label">
+        WORKSPACE <span className="num">{files.length}</span>
         <span className="ws-grow" />
         {editable && (
           <>
-            <button className="btn icon quiet" title="새 파일" aria-label="새 파일" onClick={() => setMenu((v) => !v)}>
+            <button className="ws-icon-btn" title="새 파일" aria-label="새 파일" onClick={() => startCreate('', 'file')}>
               <FilePlus aria-hidden="true" />
             </button>
-            <button className="btn icon quiet" title="새 폴더" aria-label="새 폴더" onClick={() => startCreate('', 'folder')}>
+            <button className="ws-icon-btn" title="새 폴더" aria-label="새 폴더" onClick={() => startCreate('', 'folder')}>
               <FolderPlus aria-hidden="true" />
             </button>
           </>
         )}
       </div>
-      {menu && (
-        <div className="ws-menu">
-          {NEW_FILE.map(([label, ext]) => (
-            <button key={ext} onClick={() => startCreate('', 'file', ext)}>
-              <span>{label}</span>
-              <span className="soft mono">{ext}</span>
-            </button>
-          ))}
+      <div className="ws-rows">{render(tree, 0)}</div>
+      {editable && (
+        <div className="ws-new-wrap">
+          <button className="ws-new-file" onClick={() => setMenu((v) => !v)} aria-expanded={menu}>
+            <FilePlus aria-hidden="true" /> 새 파일 <ChevronDown aria-hidden="true" />
+          </button>
+          {menu && (
+            <div className="ws-menu">
+              {NEW_FILE.map(([label, ext]) => (
+                <button key={ext} onClick={() => startCreate('', 'file', ext)}>
+                  {ext === '.docx' ? <FileText aria-hidden="true" /> : <FileCode aria-hidden="true" />}
+                  <span className="ws-grow">{label}</span>
+                  <small className="mono">{ext}</small>
+                </button>
+              ))}
+              <button onClick={() => startCreate('', 'folder')}>
+                <FolderPlus aria-hidden="true" />
+                <span className="ws-grow">새 폴더</span>
+                <small className="mono">/</small>
+              </button>
+            </div>
+          )}
         </div>
       )}
-      <div className="ws-rows">{render(tree, 0)}</div>
     </div>
   )
 }

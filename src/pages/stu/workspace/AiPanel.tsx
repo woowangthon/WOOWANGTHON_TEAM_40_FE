@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, ArrowUp, Code2, MessagesSquare, X } from 'lucide-react'
-import { Notice, Status } from '../../../ui'
+import { ArrowRight, ArrowUp, Bot, Check, Clock3, Code2, Sparkles, X } from 'lucide-react'
+import { Notice } from '../../../ui'
 import { clock, type Proposal, type WsMessage } from './wsApi'
 
 export type AiContext = { label: string; detail: string; prompt?: string }
 
-const PROPOSAL_STATUS: Record<Proposal['status'], [tone: 'doing' | 'done' | 'todo' | 'alert', label: string]> = {
-  pending: ['doing', '검토 대기'],
-  accepted: ['done', '수락 · AI 커밋으로 기록'],
-  rejected: ['todo', '거절함'],
-  edited: ['done', '직접 고쳐서 반영'],
-  stale: ['alert', '파일이 바뀌어 적용하지 못함'],
+const PROPOSAL_STATUS: Record<Proposal['status'], [cls: string, label: string]> = {
+  pending: ['waiting', '검토 대기'],
+  accepted: ['done', '수락함 · AI 커밋으로 기록'],
+  rejected: ['rejected', '거절함'],
+  edited: ['done', '직접 고쳐서 반영함'],
+  stale: ['rejected', '파일이 바뀌어 적용하지 못함'],
 }
 
 /** 코드 블록(```)과 `코드`만 따로 보여 주는 최소한의 마크다운 */
@@ -30,13 +30,7 @@ function RichText({ text }: { text: string }) {
             .map((p, j) => (
               <p key={`${i}-${j}`}>
                 {p.split(/(`[^`]+`)/).map((seg, k) =>
-                  seg.startsWith('`') && seg.endsWith('`') && seg.length > 1 ? (
-                    <code key={k} className="mono">
-                      {seg.slice(1, -1)}
-                    </code>
-                  ) : (
-                    seg
-                  ),
+                  seg.startsWith('`') && seg.endsWith('`') && seg.length > 1 ? <code key={k}>{seg.slice(1, -1)}</code> : seg,
                 )}
               </p>
             ))
@@ -103,60 +97,82 @@ export function AiPanel({
 
   return (
     <aside className="ws-ai" onFocusCapture={onFocusPanel} aria-label="AI 도우미">
-      <div className="chat-head">
-        <MessagesSquare aria-hidden="true" />
-        <span>AI 도우미</span>
-        <span className="ws-grow" />
-        <Status tone={aiAvailable ? 'doing' : 'todo'}>{aiAvailable ? '기록 중' : '연결 안 됨'}</Status>
+      <div className="ws-ai-head">
+        <span className="ws-ai-mark">
+          <Sparkles aria-hidden="true" />
+        </span>
+        <strong>AI Tutor</strong>
+        <i className={aiAvailable ? 'ws-online' : 'ws-online off'} title={aiAvailable ? '연결됨' : 'AI 키 없음'} />
       </div>
       <div className="ws-ai-body" ref={body}>
-        <p className="soft ws-small ws-ai-note">과제 단계에서는 AI 사용을 막지 않는다. 대화, 수정안, 수락 여부가 모두 기록된다.</p>
+        <div className="ws-chat-divider">
+          <span /> 작성 단계 · AI 사용 허용, 모든 대화가 기록돼요 <span />
+        </div>
         {messages.length === 0 && !sending && (
-          <div className="msg ai">코드를 선택하고 질문하면 그 범위가 함께 전달된다. 고쳐 달라고 하면 수정안을 만들어 에디터에 비교 화면으로 보여 준다.</div>
+          <div className="ws-msg ai">
+            <div className="ws-msg-author">
+              <Bot aria-hidden="true" /> Orbit AI
+            </div>
+            <p>코드를 선택하고 질문하면 선택한 범위가 함께 전달돼요. “고쳐줘”라고 하면 수정안을 만들어 에디터에 비교 화면으로 보여 드려요.</p>
+          </div>
         )}
         {messages.map((m) => {
           if (m.role === 'student') {
             const sel = m.meta?.selection as { start_line?: number; end_line?: number } | null
             return (
-              <div className="msg me" key={m.id}>
+              <div className="ws-msg me" key={m.id}>
                 {(sel?.start_line || m.meta?.path) && (
-                  <span className="ws-ctx">
+                  <div className="ws-msg-ctx">
                     <Code2 aria-hidden="true" /> {m.meta?.path}
                     {sel?.start_line ? ` ${sel.start_line}–${sel.end_line}줄` : ''}
-                  </span>
+                  </div>
                 )}
-                {m.content}
+                <p>{m.content}</p>
               </div>
             )
           }
           const p = m.meta?.proposal_id ? proposals[m.meta.proposal_id as number] : undefined
+          const st = p ? PROPOSAL_STATUS[p.status] : null
           return (
-            <div className="msg ai" key={m.id}>
-              <span className="soft ws-small">{clock(m.created_at)}</span>
+            <div className="ws-msg ai" key={m.id}>
+              <div className="ws-msg-author">
+                <Bot aria-hidden="true" /> Orbit AI <span>{clock(m.created_at)}</span>
+              </div>
               <RichText text={m.content} />
-              {p && (
-                <div className="ws-sugg">
-                  <div>
-                    <strong>코드 수정안</strong>
-                    <span className="soft">
-                      {p.file_path} · {p.start_line}
-                      {p.end_line > p.start_line ? `–${p.end_line}` : ''}번째 줄
+              {p && st && (
+                <>
+                  <div className="ws-sugg">
+                    <span className="ws-sugg-icon">
+                      <Code2 aria-hidden="true" />
                     </span>
+                    <div>
+                      <strong>코드 수정안</strong>
+                      <small>
+                        {p.file_path} · {p.start_line}
+                        {p.end_line > p.start_line ? `–${p.end_line}` : ''}번째 줄
+                      </small>
+                    </div>
+                    {p.status === 'pending' && (
+                      <button onClick={() => onShowProposal(p)}>
+                        에디터에서 보기 <ArrowRight aria-hidden="true" />
+                      </button>
+                    )}
                   </div>
-                  <Status tone={PROPOSAL_STATUS[p.status][0]}>{PROPOSAL_STATUS[p.status][1]}</Status>
-                  {p.status === 'pending' && (
-                    <button className="btn" onClick={() => onShowProposal(p)}>
-                      에디터에서 보기 <ArrowRight aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
+                  <div className={`ws-msg-status ${st[0]}`}>
+                    {p.status === 'pending' ? <Clock3 aria-hidden="true" /> : <Check aria-hidden="true" />} {st[1]}
+                  </div>
+                </>
               )}
             </div>
           )
         })}
-        {sending && <div className="msg me">{sending}</div>}
         {sending && (
-          <div className="msg ai" role="status" aria-label="AI가 답을 쓰는 중">
+          <div className="ws-msg me">
+            <p>{sending}</p>
+          </div>
+        )}
+        {sending && (
+          <div className="ws-msg ai" role="status" aria-label="AI가 답을 쓰는 중">
             <span className="typing">
               <i />
               <i />
@@ -173,18 +189,18 @@ export function AiPanel({
         </div>
       )}
       {context && (
-        <div className="ws-ctx-chip">
+        <div className="ws-selection">
           <Code2 aria-hidden="true" />
           <span className="ws-grow ws-ellipsis">
             <strong>{context.label}</strong> {context.detail}
           </span>
-          <button className="btn icon quiet" aria-label="문맥 빼기" onClick={() => setContext(null)}>
+          <button aria-label="문맥 빼기" onClick={() => setContext(null)}>
             <X aria-hidden="true" />
           </button>
         </div>
       )}
       <form
-        className="composer"
+        className="ws-composer"
         onSubmit={(e) => {
           e.preventDefault()
           void send()
@@ -192,10 +208,9 @@ export function AiPanel({
       >
         <textarea
           ref={input}
-          rows={2}
           value={text}
           disabled={disabled}
-          placeholder={disabled ? '제출한 뒤에는 질문할 수 없다' : aiAvailable ? '코드나 과제에 대해 질문한다' : '서버에 AI 키가 없다'}
+          placeholder={disabled ? '제출한 뒤에는 질문할 수 없어요.' : aiAvailable ? '코드나 과제에 대해 질문하세요...' : '서버에 AI 키가 없어요.'}
           aria-label="메시지"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -205,11 +220,16 @@ export function AiPanel({
             }
           }}
         />
-        <button className="btn primary icon" type="submit" aria-label="보내기" disabled={!text.trim() || Boolean(sending) || disabled}>
-          <ArrowUp aria-hidden="true" />
-        </button>
+        <div className="ws-composer-bottom">
+          <span>Enter 보내기 · Shift+Enter 줄바꿈</span>
+          <button type="submit" className="ws-send" aria-label="보내기" disabled={!text.trim() || Boolean(sending) || disabled}>
+            <ArrowUp aria-hidden="true" />
+          </button>
+        </div>
       </form>
-      <p className="soft ws-small ws-ai-foot num">이번 시도 질문 {asked}회</p>
+      <div className="ws-usage">
+        이번 시도 AI 질문 <strong className="num">{asked}회</strong> · 모두 기록됨
+      </div>
     </aside>
   )
 }

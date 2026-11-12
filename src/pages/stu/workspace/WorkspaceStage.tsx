@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, History, Info, Send, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronRight, Circle, GitCommitHorizontal, History, Info, SquareFunction, X } from 'lucide-react'
 import { ApiError, type Enrollment } from '../../../api'
 import { Loading, Notice } from '../../../ui'
 import { AiPanel, type AiContext } from './AiPanel'
 import { CodeEditor, type PasteInfo } from './CodeEditor'
-import { CompleteDialog, PastePopup, type PendingPaste } from './dialogs'
+import { BriefDialog, CompleteDialog, PastePopup, type PendingPaste } from './dialogs'
 import { DocEditor } from './DocEditor'
 import { FileIcon, FileTree } from './FileTree'
 import { HistoryView } from './HistoryView'
@@ -68,6 +68,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
   /* 화면 */
   const [history, setHistory] = useState(false)
   const [brief, setBrief] = useState(false)
+  const [recordInfo, setRecordInfo] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [pendingPaste, setPendingPaste] = useState<PendingPaste | null>(null)
   const [submitBusy, setSubmitBusy] = useState(false)
@@ -457,12 +458,16 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
       {/* 수정 이력을 보는 동안에도 작업 화면을 내리지 않는다. 보고서 편집 세션이 끊기지 않게 하기 위해서다 */}
       <div className="ws" style={history ? { display: 'none' } : undefined}>
         <aside className="ws-side">
-          <button className="ws-brief" onClick={() => setBrief((v) => !v)} aria-expanded={brief}>
-            <Info aria-hidden="true" />
-            <span className="ws-grow">과제 설명</span>
-            <span className="soft ws-small">{brief ? '접기' : '펼치기'}</span>
+          <button className="ws-brief-card" onClick={() => setBrief(true)}>
+            <span className="ws-brief-icon">
+              <SquareFunction aria-hidden="true" />
+            </span>
+            <span className="ws-grow">
+              <strong>과제 설명</strong>
+              <small>{w.description.split('\n')[0] || w.title}</small>
+            </span>
+            <ChevronRight aria-hidden="true" />
           </button>
-          {brief && <p className="ws-brief-text">{w.description || '교수가 과제 설명을 쓰지 않았다'}</p>}
           <FileTree
             files={w.files}
             changed={changed}
@@ -473,12 +478,24 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
             onRename={renameFile}
             onDelete={deleteFile}
           />
-          <p className="ws-record soft ws-small">
-            <span className="status doing">
-              <i />
-            </span>
-            과정 기록 중 · 편집, 붙여넣기, AI 사용, 실행이 모두 남는다
-          </p>
+          <div className="ws-record">
+            <button className="ws-record-chip" onClick={() => setRecordInfo((v) => !v)} aria-expanded={recordInfo}>
+              <Circle aria-hidden="true" /> 과정 기록 중 <Info aria-hidden="true" />
+            </button>
+            {recordInfo && (
+              <div className="ws-record-pop">
+                <strong>무엇이 기록되나요?</strong>
+                <ul>
+                  <li>편집 내용 (포커스 이동 · 파일 전환 · 30초 정지 시 묶어서 저장)</li>
+                  <li>파일 만들기, 이름 바꾸기, 삭제</li>
+                  <li>AI 대화, 수정안 수락 / 거절 / 직접 수정</li>
+                  <li>코드 실행 · 컴파일 · 테스트 결과</li>
+                  <li>붙여넣기 길이와 시점, 직접 적은 출처</li>
+                </ul>
+                <p>AI 사용은 감점이 아니에요. 교수는 이 기록으로 과정을 확인해요.</p>
+              </div>
+            )}
+          </div>
         </aside>
 
         <section className="ws-main" aria-label="작업 영역">
@@ -508,26 +525,23 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
                 )
               })}
             </div>
-            <span className="ws-save soft ws-small num">
+            <span className="ws-meta num">
               {saving > 0 ? (
                 <>
-                  <span className="typing">
-                    <i />
-                    <i />
-                    <i />
-                  </span>{' '}
-                  저장 중
+                  <span className="ws-mini-spinner" /> 저장 중
                 </>
               ) : editable ? (
                 <>
-                  <Check aria-hidden="true" /> 저장됨{commits[0] ? ` · ${commitLabel(commits[0])}` : ''}
+                  <Check aria-hidden="true" /> 자동 저장
                 </>
               ) : (
                 '제출됨 · 읽기 전용'
               )}
+              <i className="ws-meta-sep" />
+              <GitCommitHorizontal aria-hidden="true" /> 마지막 커밋 {commits[0] ? commitLabel(commits[0]) : '-'}
             </span>
             <button
-              className="btn"
+              className="ws-btn"
               onClick={() => {
                 void commitAll('open_history')
                 setHistory(true)
@@ -536,12 +550,12 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
               <History aria-hidden="true" /> 수정 이력
             </button>
             {editable ? (
-              <button className="btn primary" onClick={() => setConfirming(true)} disabled={commits.length === 0}>
-                <Send aria-hidden="true" /> 제출
+              <button className="ws-btn primary" onClick={() => setConfirming(true)} disabled={commits.length === 0}>
+                작성 완료 <ArrowRight aria-hidden="true" />
               </button>
             ) : (
               canRetry && (
-                <button className="btn primary" onClick={() => void startAttempt()}>
+                <button className="ws-btn primary" onClick={() => void startAttempt()}>
                   재제출 시도 시작
                 </button>
               )
@@ -625,6 +639,17 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
         />
       </div>
 
+      {brief && (
+        <BriefDialog
+          subject={w.subject}
+          title={w.title}
+          deadline={w.deadline ? new Date(w.deadline.endsWith('Z') ? w.deadline : `${w.deadline}Z`).toLocaleString('ko-KR') : '없음'}
+          description={w.description}
+          files={w.files}
+          testCount={w.tests.length}
+          onClose={() => setBrief(false)}
+        />
+      )}
       {confirming && (
         <CompleteDialog
           files={w.files.filter((f) => !f.readonly).map((f) => f.path)}
