@@ -2277,3 +2277,55 @@
     grid-template-columns: 1fr;
   }
 }
+
+.ws-env-progress {
+  height: 6px;
+  margin-top: 14px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.ws-env-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.6s var(--ease);
+}
+
+.ws-env-prep > p {
+  margin-top: 8px;
+}
+
+.ws-env-log {
+  max-height: 120px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--bg-2);
+  color: var(--text-2);
+  font: 11.5px/1.55 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ws-env-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  color: var(--alert);
+}
+
+.ws-modal .ws-mini-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ws-spin 0.8s linear infinite;
+  vertical-align: -1px;
+}

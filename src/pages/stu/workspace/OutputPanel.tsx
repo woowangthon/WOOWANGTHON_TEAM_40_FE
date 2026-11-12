@@ -30,6 +30,7 @@ export function OutputPanel({
   stdin,
   setStdin,
   onAskAi,
+  envName,
 }: {
   running: boolean
   run: RunView
@@ -39,6 +40,8 @@ export function OutputPanel({
   stdin: string
   setStdin: (v: string) => void
   onAskAi: (label: string, prompt: string) => void
+  /** 지금 고른 실행 환경 이름 */
+  envName: string
 }) {
   const [open, setOpen] = useState(true)
   const [openTest, setOpenTest] = useState<string | null>(null)
@@ -73,7 +76,9 @@ export function OutputPanel({
           </button>
         ))}
         <span className="ws-grow" />
-        <small className="ws-sandbox">격리된 실행 환경 · 5초 / 384MB 제한</small>
+        <small className="ws-sandbox">
+          {r?.env_os ?? envName} · 격리 실행 · 5초 / 384MB
+        </small>
         <button className="ws-icon-btn" aria-label={open ? '실행 패널 접기' : '실행 패널 펼치기'} onClick={() => setOpen((v) => !v)}>
           {open ? <ChevronDown aria-hidden="true" /> : <ChevronUp aria-hidden="true" />}
         </button>

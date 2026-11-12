@@ -74,7 +74,27 @@ export type RunResult = {
   timed_out?: boolean
   duration?: number
   error?: string
+  env?: 'default' | 'professor'
+  env_os?: string
 }
+
+export type EnvView = {
+  key: 'default' | 'professor'
+  name: string
+  os: string
+  python: string
+  cpp: string
+  java: string
+  apt: string[]
+  pip: string[]
+  cflags: string
+  status: 'ready' | 'building' | 'failed' | 'none' | 'missing'
+  required?: boolean
+  log?: string
+  started_at?: string | null
+}
+
+export type EnvInfo = { default: EnvView; professor: (EnvView & { required: boolean }) | null; chosen: 'default' | 'professor' | null }
 
 export type Workspace = {
   enrollment_id: number
@@ -94,6 +114,7 @@ export type Workspace = {
   tests: { name: string }[]
   last_run: RunResult | null
   ai_available: boolean
+  environment: EnvInfo
 }
 
 export type Selection = { start_line: number; end_line: number; text: string }
@@ -130,8 +151,10 @@ export const ws = {
       body: text === undefined ? {} : { text },
     }),
   reject: (eid: number, id: number) => request<{ proposal: Proposal }>('POST', `${base(eid)}/proposals/${id}/reject`),
-  run: (eid: number, path: string, mode: 'run' | 'test', stdin: string) =>
-    request<{ result: RunResult; commit: WsCommit }>('POST', `${base(eid)}/run`, { body: { path, mode, stdin } }),
+  run: (eid: number, path: string, mode: 'run' | 'test', stdin: string, env?: 'default' | 'professor') =>
+    request<{ result: RunResult; commit: WsCommit }>('POST', `${base(eid)}/run`, { body: { path, mode, stdin, env } }),
+  envGet: (eid: number) => request<EnvInfo>('GET', `${base(eid)}/environment`),
+  envPick: (eid: number, key: 'default' | 'professor') => request<EnvInfo>('POST', `${base(eid)}/environment`, { body: { key } }),
   docConfig: (eid: number, path: string, theme: string) =>
     request<{ api_url: string; config: Record<string, unknown> }>(
       'GET',

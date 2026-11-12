@@ -6,7 +6,7 @@ import { AiPanel, type AiContext } from './AiPanel'
 import { CodeEditor, type PasteInfo } from './CodeEditor'
 import { BriefDialog, CompleteDialog, PastePopup, type PendingPaste } from './dialogs'
 import { DocEditor } from './DocEditor'
-import { DEFAULT_ENV, EnvDialog, EnvSelect, envLabel, professorEnv, type EnvChoice } from './EnvSelect'
+import { EnvDialog, EnvSelect, envLabel } from './EnvSelect'
 import { FileIcon, FileTree } from './FileTree'
 import { HistoryView } from './HistoryView'
 import { OutputPanel, type RunView } from './OutputPanel'
@@ -78,30 +78,10 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
       return { left: false, right: false }
     }
   })
-  /* 실행 환경 선택 (프로토타입). 고른 값은 이 브라우저에 두고 선택 사실은 이벤트로 남긴다 */
-  const prof = professorEnv(enrollment.assignment.tool_config ?? {})
-  const envKey = `ws_env_${eid}`
-  const [envChoice, setEnvChoice] = useState<EnvChoice | null>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(envKey) ?? 'null') as EnvChoice | null
-    } catch {
-      return null
-    }
-  })
+  /* 실행 환경. 학생이 고른 값은 서버의 과정 기록(env_select)에 남는다 */
   const [envPicking, setEnvPicking] = useState(false)
   const [envOpen, setEnvOpen] = useState(false)
-  const effectiveEnv = prof.required || envChoice?.key !== 'default' ? prof : DEFAULT_ENV
-  const pickEnv = (key: EnvChoice['key']) => {
-    const choice = { key, at: new Date().toISOString() }
-    setEnvChoice(choice)
-    setEnvPicking(false)
-    try {
-      localStorage.setItem(envKey, JSON.stringify(choice))
-    } catch {
-      // 저장이 막힌 환경이면 이번 화면에서만 유지한다
-    }
-    ws.events(eid, [{ kind: 'env_select', payload: { env: key, os: key === 'professor' ? prof.os : DEFAULT_ENV.os, required: prof.required } }]).catch(() => undefined)
-  }
+  const [proCheck, setProCheck] = useState<{ state: 'idle' | 'running' | 'done' | 'error'; text: string }>({ state: 'idle', text: '' })
 
   const togglePanel = (side: 'left' | 'right') =>
     setClosed((c) => {
@@ -472,6 +452,27 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
     }
   }
 
+  const openConfirm = async () => {
+    setConfirming(true)
+    setProCheck({ state: 'idle', text: '' })
+    if (!w || !needProCheck) return
+    const target = w.files.find((f) => f.path === activeRef.current && f.kind === 'code' && f.language) ?? w.files.find((f) => f.kind === 'code' && f.language && !f.readonly)
+    if (!target) return
+    setProCheck({ state: 'running', text: '교수 환경에서 테스트하는 중' })
+    try {
+      await commitAll('before_submit_check')
+      const r = await ws.run(eid, target.path, 'test', '', 'professor')
+      setCommits((l) => [r.commit, ...l])
+      const t = r.result
+      setProCheck({
+        state: 'done',
+        text: t.compile_error ? '교수 환경에서 컴파일 오류가 났다' : t.total ? `교수 환경 테스트 ${t.passed} / ${t.total} 통과` : (t.error ?? '교수 환경에서 실행했다'),
+      })
+    } catch (e) {
+      setProCheck({ state: 'error', text: errorText(e) })
+    }
+  }
+
   const startAttempt = async () => {
     try {
       await ws.newAttempt(eid)
@@ -489,12 +490,26 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
   const changed = new Set(Object.keys(contents).filter((p) => contents[p] !== committedRef.current[p]))
   const file = w.files.find((f) => f.path === active)
   const pending = Object.values(proposals).filter((p) => p.status === 'pending').length
+  const envInfo = w.environment
+  // 교수 환경이 있는데 아직 고르지 않았으면(필수면 한 번 확인) 첫 화면에서 고르게 한다
+  const needEnv = w.editable && Boolean(envInfo.professor) && (envInfo.chosen === null || envPicking)
+  const curEnv = envInfo.chosen === 'professor' && envInfo.professor ? envInfo.professor : envInfo.default
+  // 권장 환경인데 기본 환경을 골랐으면 제출 전에 교수 환경에서 테스트를 한 번 더 돌린다
+  const needProCheck = Boolean(envInfo.professor && !envInfo.professor.required && envInfo.chosen === 'default')
   const canRetry = !w.editable && enrollment.stage === 'done' && !w.deadline_passed && enrollment.attempts.every((a) => a.status === 'submitted')
 
   return (
     <>
-      {w.editable && (!envChoice || envPicking) && !history && (
-        <EnvSelect prof={prof} current={envChoice} onPick={pickEnv} onCancel={envChoice ? () => setEnvPicking(false) : undefined} />
+      {needEnv && !history && (
+        <EnvSelect
+          eid={eid}
+          info={w.environment}
+          onDone={(info) => {
+            setW((x) => (x ? { ...x, environment: info } : x))
+            setEnvPicking(false)
+          }}
+          onCancel={w.environment.chosen ? () => setEnvPicking(false) : undefined}
+        />
       )}
       {history && (
         <HistoryView
@@ -504,7 +519,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
         />
       )}
       {/* 수정 이력을 보는 동안에도 작업 화면을 내리지 않는다. 보고서 편집 세션이 끊기지 않게 하기 위해서다 */}
-      <div className={`ws${closed.left ? ' left-closed' : ''}${closed.right ? ' right-closed' : ''}`} style={history || (w.editable && (!envChoice || envPicking)) ? { display: 'none' } : undefined}>
+      <div className={`ws${closed.left ? ' left-closed' : ''}${closed.right ? ' right-closed' : ''}`} style={history || needEnv ? { display: 'none' } : undefined}>
         {closed.left ? (
           <aside className="ws-side ws-rail" aria-label="파일">
             <button className="ws-icon-btn" title="파일 패널 열기" aria-label="파일 패널 열기" onClick={() => togglePanel('left')}>
@@ -594,7 +609,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
               })}
             </div>
             <button className="ws-env-chip" onClick={() => setEnvOpen(true)} title="실행 환경 보기">
-              <Monitor aria-hidden="true" /> {envLabel(effectiveEnv)}
+              <Monitor aria-hidden="true" /> {envLabel(curEnv)}
             </button>
             <span className="ws-meta num">
               {saving > 0 ? (
@@ -621,7 +636,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
               <History aria-hidden="true" /> 수정 이력
             </button>
             {editable ? (
-              <button className="ws-btn primary" onClick={() => setConfirming(true)} disabled={commits.length === 0}>
+              <button className="ws-btn primary" onClick={() => openConfirm()} disabled={commits.length === 0}>
                 작성 완료 <ArrowRight aria-hidden="true" />
               </button>
             ) : (
@@ -681,6 +696,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
                 stdin={stdin}
                 setStdin={setStdin}
                 onAskAi={(label, prompt) => askAi(label, '실행 결과', prompt)}
+                envName={curEnv.os}
               />
             </div>
           )}
@@ -727,8 +743,8 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
 
       {envOpen && (
         <EnvDialog
-          env={effectiveEnv}
-          required={prof.required || !w.editable}
+          env={curEnv}
+          canChange={w.editable && Boolean(w.environment.professor) && !w.environment.professor?.required}
           onClose={() => setEnvOpen(false)}
           onChange={() => {
             setEnvOpen(false)
@@ -755,6 +771,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
           tests={{ passed: run?.result.passed ?? 0, total: run?.result.total ?? 0 }}
           unattributedPastes={commits.filter((c) => c.meta?.paste && !c.meta.paste.source).length}
           pendingSuggestions={pending}
+          proCheck={needProCheck ? proCheck : null}
           busy={submitBusy}
           error={submitError}
           onClose={() => setConfirming(false)}

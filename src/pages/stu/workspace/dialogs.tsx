@@ -69,6 +69,7 @@ export function CompleteDialog({
   tests,
   unattributedPastes,
   pendingSuggestions,
+  proCheck,
   busy,
   error,
   onClose,
@@ -80,6 +81,8 @@ export function CompleteDialog({
   tests: { passed: number; total: number }
   unattributedPastes: number
   pendingSuggestions: number
+  /** 기본 환경을 골랐을 때 제출 전에 교수 환경에서 돌린 테스트 */
+  proCheck: { state: 'idle' | 'running' | 'done' | 'error'; text: string } | null
   busy: boolean
   error: string | null
   onClose: () => void
@@ -103,6 +106,14 @@ export function CompleteDialog({
         <dd className="num">{aiCount}회</dd>
         <dt>테스트</dt>
         <dd className="num">{tests.total ? `${tests.passed} / ${tests.total} 통과` : '-'}</dd>
+        {proCheck && proCheck.state !== 'idle' && (
+          <>
+            <dt>교수 환경</dt>
+            <dd className={proCheck.state === 'error' ? 'ws-alert' : 'num'}>
+              {proCheck.state === 'running' && <span className="ws-mini-spinner" />} {proCheck.text}
+            </dd>
+          </>
+        )}
       </dl>
       {checks.length > 0 && (
         <ul className="ws-checks">
@@ -116,7 +127,7 @@ export function CompleteDialog({
         <button className="btn" onClick={onClose}>
           계속 작성
         </button>
-        <button className="btn primary" onClick={onSubmit} disabled={busy}>
+        <button className="btn primary" onClick={onSubmit} disabled={busy || proCheck?.state === 'running'}>
           {busy ? '제출 중' : '제출하고 사후평가로'}
         </button>
       </div>

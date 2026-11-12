@@ -1,64 +1,20 @@
-// 실행 환경 선택. 지금은 화면만 확인하는 프로토타입이다.
-// 교수 환경 값은 과제 설정(tool_config.environment)에 있으면 그것을, 없으면 아래 예시 값을 쓴다.
-// 실제 Docker 이미지 빌드와 실행 연결은 아직 없다.
-import { useEffect, useState } from 'react'
-import { ArrowRight, Check, Cpu, GraduationCap, Info, Lock, Monitor, Package, Settings2 } from 'lucide-react'
+// 실행환경 설정. 기본 환경과 교수가 지정한 환경 중에서 고른다.
+// 교수 환경은 과제마다 Docker 이미지로 만들어 두고(처음 한 번 몇 분), 고른 환경에서 실행과 테스트가 돈다.
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRight, Check, Cpu, GraduationCap, Info, Lock, Monitor, Package, RotateCcw, Settings2, TriangleAlert } from 'lucide-react'
 import { Modal } from './dialogs'
+import { errorText, ws, type EnvInfo, type EnvView } from './wsApi'
 
-export type EnvSpec = {
-  key: 'default' | 'professor'
-  name: string
-  os: string
-  python: string
-  cpp: string
-  java: string
-  apt: string[]
-  pip: string[]
-  flags: string
-  note?: string
+const NOTE: Record<EnvView['key'], string> = {
+  professor: '교수가 지정한 채점 환경',
+  default: '서비스 기본 환경',
 }
 
-export type EnvChoice = { key: EnvSpec['key']; at: string }
-
-export const DEFAULT_ENV: EnvSpec = {
-  key: 'default',
-  name: '기본 환경',
-  os: 'Debian 12 (bookworm)',
-  python: 'Python 3.12',
-  cpp: 'g++ 14 · C++17',
-  java: 'OpenJDK 21',
-  apt: [],
-  pip: [],
-  flags: '-std=c++17 -O2',
-  note: '서비스 기본 환경',
-}
-
-const SAMPLE_PROFESSOR_ENV: EnvSpec & { required: boolean } = {
-  key: 'professor',
-  name: '운영체제 과제 채점 환경',
-  required: false,
-  os: 'Ubuntu 22.04 LTS',
-  python: 'Python 3.10',
-  cpp: 'g++ 11 · C++17',
-  java: 'OpenJDK 17',
-  apt: ['build-essential', 'valgrind'],
-  pip: ['numpy', 'matplotlib'],
-  flags: '-std=c++17 -O2 -Wall',
-  note: '교수가 지정한 채점 환경',
-}
-
-/** 과제 설정에 교수 환경이 있으면 읽고, 없으면 예시를 쓴다. ?env=required 로 필수 모드를 미리 볼 수 있다 */
-export function professorEnv(toolConfig: Record<string, unknown>): EnvSpec & { required: boolean } {
-  const raw = toolConfig.environment as Partial<EnvSpec & { required: boolean }> | undefined
-  const required = new URLSearchParams(window.location.search).get('env') === 'required'
-  return { ...SAMPLE_PROFESSOR_ENV, ...(raw ?? {}), key: 'professor', required: required || Boolean(raw?.required) }
-}
-
-export function envLabel(e: EnvSpec): string {
+export function envLabel(e: EnvView): string {
   return `${e.os.split(' (')[0]} · ${e.key === 'professor' ? '교수 환경' : '기본 환경'}`
 }
 
-function Spec({ env }: { env: EnvSpec }) {
+function Spec({ env }: { env: EnvView }) {
   return (
     <dl className="ws-env-spec">
       <dt>
@@ -71,7 +27,7 @@ function Spec({ env }: { env: EnvSpec }) {
       <dd>
         {env.python}
         <br />
-        {env.cpp}
+        {env.cpp} · C++17
         <br />
         {env.java}
       </dd>
@@ -96,43 +52,68 @@ function Spec({ env }: { env: EnvSpec }) {
         <Settings2 aria-hidden="true" /> 컴파일
       </dt>
       <dd>
-        <code>{env.flags}</code>
+        <code>{env.cflags}</code>
       </dd>
     </dl>
   )
 }
 
-/** 과제 단계 첫 화면. 기본 환경과 교수 환경 중에서 고른다 */
-export function EnvSelect({
-  prof,
-  current,
-  onPick,
-  onCancel,
-}: {
-  prof: EnvSpec & { required: boolean }
-  current: EnvChoice | null
-  onPick: (key: EnvSpec['key']) => void
-  onCancel?: () => void
-}) {
-  const [picked, setPicked] = useState<EnvSpec['key']>(current?.key ?? 'professor')
-  const [step, setStep] = useState(-1)
-  const steps = ['실행 이미지 확인', '패키지 확인', '컴파일러와 런타임 확인', '작업공간 연결']
+/** docker build 로그에서 "Step 2/4 : RUN apt-get ..." 을 찾아 진행 상황을 만든다 */
+function progressOf(log: string): { step: number; total: number; text: string } | null {
+  const steps = [...log.matchAll(/Step (\d+)\/(\d+) : (.*)/g)]
+  const last = steps[steps.length - 1]
+  if (!last) return null
+  const raw = last[3]
+  const text = raw.startsWith('FROM') ? '기반 OS 이미지 받기' : raw.includes('apt-get') ? 'OS 패키지와 컴파일러 설치' : raw.includes('pip install') ? 'Python 패키지 설치' : '환경 설정'
+  return { step: Number(last[1]), total: Number(last[2]), text }
+}
 
-  // 준비 과정은 화면을 보여 주기 위한 흉내다. 실제 연결 때 서버 진행 상황으로 바꾼다
-  useEffect(() => {
-    if (step < 0) return
-    if (step >= steps.length) {
-      onPick(picked)
-      return
+/** 과제 단계 첫 화면, 또는 작업 중에 환경을 바꿀 때 */
+export function EnvSelect({ eid, info, onDone, onCancel }: { eid: number; info: EnvInfo; onDone: (info: EnvInfo) => void; onCancel?: () => void }) {
+  const prof = info.professor
+  const [picked, setPicked] = useState<EnvView['key']>(info.chosen ?? (prof ? 'professor' : 'default'))
+  const [live, setLive] = useState<EnvInfo | null>(null) // 준비 중일 때 서버에서 받은 최신 상태
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const started = useRef<number>(0)
+  const [, tick] = useState(0)
+  const done = useRef(onDone)
+  done.current = onDone
+
+  const start = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const next = await ws.envPick(eid, picked)
+      if (picked === 'default' || next.professor?.status === 'ready') return onDone(next)
+      started.current = Date.now()
+      setLive(next)
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
     }
-    const t = window.setTimeout(() => setStep((s) => s + 1), 450)
-    return () => window.clearTimeout(t)
-  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
-  const cards: [EnvSpec, boolean][] = [
-    [prof, false],
-    [DEFAULT_ENV, prof.required],
-  ]
+  // 교수 환경 이미지를 만드는 동안 2초마다 상태를 받는다
+  useEffect(() => {
+    if (!live || live.professor?.status === 'failed') return
+    const t = window.setInterval(() => {
+      tick((n) => n + 1)
+      ws.envGet(eid)
+        .then((next) => {
+          if (next.professor?.status === 'ready') done.current(next)
+          else setLive(next)
+        })
+        .catch((e) => setError(errorText(e)))
+    }, 2000)
+    return () => window.clearInterval(t)
+  }, [live, eid])
+
+  const cards: [EnvView, boolean][] = prof ? [[prof, false], [info.default, prof.required]] : [[info.default, false]]
+  const p = live?.professor
+  const prog = p ? progressOf(p.log ?? '') : null
+  const secs = started.current ? Math.round((Date.now() - started.current) / 1000) : 0
 
   return (
     <div className="ws-env">
@@ -147,7 +128,7 @@ export function EnvSelect({
                 key={env.key}
                 role="radio"
                 aria-checked={on}
-                disabled={locked || step >= 0}
+                disabled={locked || Boolean(live) || busy}
                 className={`ws-env-card${on ? ' on' : ''}${locked ? ' locked' : ''}`}
                 onClick={() => setPicked(env.key)}
               >
@@ -157,11 +138,14 @@ export function EnvSelect({
                     <strong>{env.key === 'professor' ? '교수 지정 환경' : '기본 환경'}</strong>
                     <small>{env.key === 'professor' ? env.name : '서비스 표준'}</small>
                   </div>
-                  {env.key === 'professor' && <span className={prof.required ? 'ws-env-badge req' : 'ws-env-badge'}>{prof.required ? '필수' : '권장'}</span>}
+                  {env.key === 'professor' && prof && <span className={prof.required ? 'ws-env-badge req' : 'ws-env-badge'}>{prof.required ? '필수' : '권장'}</span>}
                   <span className="ws-env-radio">{on && <Check aria-hidden="true" />}</span>
                 </div>
                 <Spec env={env} />
-                {env.note && <p className="ws-env-note">{env.note}</p>}
+                <p className="ws-env-note">
+                  {NOTE[env.key]}
+                  {env.key === 'professor' && env.status !== 'ready' && <span className="soft"> · 처음 고르면 환경을 만드는 데 몇 분 걸려요</span>}
+                </p>
                 {locked && (
                   <p className="ws-env-lock">
                     <Lock aria-hidden="true" /> 교수가 지정 환경을 필수로 정해 고를 수 없다
@@ -172,34 +156,54 @@ export function EnvSelect({
           })}
         </div>
 
-        {!prof.required && (
+        {prof && !prof.required && (
           <p className="ws-env-hint">
             <Info aria-hidden="true" /> 기본 환경을 골라도 제출할 때는 교수 환경에서 테스트를 한 번 더 돌립니다.
           </p>
         )}
 
-        {step < 0 ? (
+        {error && (
+          <p className="ws-env-error">
+            <TriangleAlert aria-hidden="true" /> {error}
+          </p>
+        )}
+
+        {!live ? (
           <div className="ws-env-actions">
             {onCancel && (
-              <button className="ws-btn" onClick={onCancel}>
+              <button className="ws-btn" onClick={onCancel} disabled={busy}>
                 취소
               </button>
             )}
-            <button className="ws-btn primary lg" onClick={() => setStep(0)}>
+            <button className="ws-btn primary lg" onClick={() => void start()} disabled={busy}>
               이 환경으로 시작 <ArrowRight aria-hidden="true" />
             </button>
           </div>
         ) : (
           <div className="ws-env-prep" role="status">
-            <strong>{picked === 'professor' ? prof.os : DEFAULT_ENV.os} 환경을 준비하는 중</strong>
-            <ol>
-              {steps.map((s, i) => (
-                <li key={s} className={i < step ? 'done' : i === step ? 'now' : ''}>
-                  <span>{i < step ? <Check aria-hidden="true" /> : i === step ? <i className="ws-mini-spinner" /> : null}</span>
-                  {s}
-                </li>
-              ))}
-            </ol>
+            <strong>
+              {p?.status === 'failed' ? `${p.os} 환경을 만들지 못했어요` : `${p?.os} 환경을 만드는 중`}
+              <span className="soft num"> · {secs}초</span>
+            </strong>
+            {p?.status === 'failed' ? (
+              <>
+                <pre className="ws-env-log">{(p.log ?? '').split('\n').slice(-8).join('\n')}</pre>
+                <div className="ws-env-actions">
+                  <button className="ws-btn primary" onClick={() => void start()}>
+                    <RotateCcw aria-hidden="true" /> 다시 시도
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="ws-env-progress">
+                  <i style={{ width: `${prog ? Math.round(((prog.step - 0.5) / prog.total) * 100) : 4}%` }} />
+                </div>
+                <p className="soft num">{prog ? `${prog.step}/${prog.total} 단계 · ${prog.text}` : '빌드를 시작하는 중'}</p>
+                <pre className="ws-env-log">{(p?.log ?? '').split('\n').filter(Boolean).slice(-4).join('\n') || '…'}</pre>
+                <p className="soft ws-small">처음 한 번만 만들고, 같은 과제의 다른 학생과 다음 접속부터는 바로 열려요.</p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -208,7 +212,7 @@ export function EnvSelect({
 }
 
 /** 작업 중에 환경 칩을 누르면 뜨는 창 */
-export function EnvDialog({ env, required, onChange, onClose }: { env: EnvSpec; required: boolean; onChange: () => void; onClose: () => void }) {
+export function EnvDialog({ env, canChange, onChange, onClose }: { env: EnvView; canChange: boolean; onChange: () => void; onClose: () => void }) {
   return (
     <Modal title="실행 환경" onClose={onClose}>
       <div className="ws-env-card-head">
@@ -219,12 +223,12 @@ export function EnvDialog({ env, required, onChange, onClose }: { env: EnvSpec; 
         </div>
       </div>
       <Spec env={env} />
-      {env.note && <p className="ws-note">{env.note}</p>}
+      <p className="ws-note">{NOTE[env.key]}</p>
       <div className="ws-modal-actions">
         <button className="ws-btn" onClick={onClose}>
           닫기
         </button>
-        {!required && (
+        {canChange && (
           <button className="ws-btn primary" onClick={onChange}>
             환경 바꾸기
           </button>
