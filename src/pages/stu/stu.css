@@ -1,0 +1,253 @@
+/* 학생 단계 화면에서만 쓰는 규칙. 색은 design.css 맨 위의 변수만 쓴다. */
+@scope (:root) to (.legacy) {
+  /* 위쪽 바 */
+  .topbar .title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar .right {
+    min-width: 0;
+  }
+
+  @media (max-width: 1040px) {
+    .topbar .right > span {
+      display: none;
+    }
+  }
+
+  .stage-notice {
+    padding: 12px 16px 0;
+  }
+
+  .stage-notice .notice {
+    margin-bottom: 0;
+  }
+
+  /* 공용 내려받기 버튼이 실패했을 때 내는 글자 */
+  .topbar .right > .error,
+  .stu-page .row .end > .error,
+  .learn .file > .error {
+    color: var(--alert);
+  }
+
+  /* 팀원의 과제 단계 화면을 감싸는 틀. 예전 화면의 본문 폭과 여백을 그대로 둔다. */
+  .task-frame {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* 개요, 시험 안내, 시험 결과, 결과 요약 */
+  .stu-page .prose {
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* 요약 칸은 내용 길이에 맞추고 이름은 한 줄로 둔다. */
+  .stu-page .meta > div {
+    flex: 1 1 auto;
+  }
+
+  .stu-page .meta dt {
+    white-space: nowrap;
+  }
+
+  .stu-page .prose + .meta,
+  .stu-page .rows + .meta,
+  .stu-page .meta + .prose,
+  .stu-page .meta + .rows,
+  .stu-page .meta + .table-wrap,
+  .stu-page .meta + .src-legend,
+  .stu-page .chart + .table-wrap {
+    margin-top: 14px;
+  }
+
+  .stu-page .facts .row > span:not(.end) {
+    flex: none;
+  }
+
+  .stu-page .facts .row .end {
+    text-align: right;
+  }
+
+  .stu-page .score-rows .val {
+    width: 40px;
+    flex: none;
+    text-align: right;
+  }
+
+  .stu-page .score-rows .st {
+    width: 124px;
+    flex: none;
+  }
+
+  /* 시험 */
+  .exam .q-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .exam .q > .input {
+    max-width: 320px;
+  }
+
+  .exam .opt {
+    padding: 8px 12px;
+    line-height: 1.5;
+  }
+
+  /* 빈칸은 문장 흐름 안에 둔다. */
+  .exam .cloze {
+    display: block;
+    line-height: 2.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .exam .cloze .input {
+    display: inline-block;
+    margin: 0 6px;
+    line-height: 1.5;
+    vertical-align: middle;
+  }
+
+  .exam .rail .confirm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .exam .rail .notice {
+    margin-bottom: 0;
+  }
+
+  /* 채점한 문항 */
+  .wrong mark.bad {
+    color: inherit;
+  }
+
+  .wrong .wrong-q,
+  .wrong .ans dd {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .wrong .wrong-head > span:first-child,
+  .wrong .wrong-head .end {
+    flex: none;
+  }
+
+  .wrong .wrong-head > span:nth-child(2) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 학습 */
+  .learn .spec-row > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .learn .goal {
+    gap: 8px;
+  }
+
+  .learn .goal > span:first-child,
+  .learn .file .fname {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .learn .goal .btn,
+  .learn .file .btn {
+    height: 26px;
+    padding: 0 8px;
+  }
+
+  .learn > aside .empty {
+    padding: 4px 0;
+    text-align: left;
+  }
+
+  .learn > aside .notice {
+    margin-bottom: 0;
+  }
+
+  .learn .rule-list {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.6;
+  }
+
+  .chat-head > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat .msg {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .chat .msg-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin-top: 6px;
+    white-space: normal;
+  }
+
+  /* 확인 문항은 대화 안에 테두리 상자로 넣는다. */
+  .chat .msg.check {
+    display: grid;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r2);
+  }
+
+  .chat .check-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: normal;
+  }
+
+  .chat .check-head svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--text-2);
+  }
+
+  .chat .check-head b {
+    font-weight: 600;
+  }
+
+  .chat .chat-alert {
+    width: calc(100% - 48px);
+    max-width: 632px;
+    margin: 0 auto 12px;
+  }
+
+  .chat .chat-alert .notice {
+    margin-bottom: 0;
+  }
+
+  /* 입력한 줄 수만큼 입력 칸이 늘어난다. */
+  .chat .composer textarea {
+    field-sizing: content;
+    max-height: 168px;
+  }
+}

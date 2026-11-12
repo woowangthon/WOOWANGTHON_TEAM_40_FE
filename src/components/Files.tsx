@@ -36,8 +36,10 @@ export function DownloadButton({
   className?: string
 }) {
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   async function download() {
     setBusy(true)
+    setError(null)
     try {
       const url = await fetchBlobUrl(path)
       const a = document.createElement('a')
@@ -48,14 +50,17 @@ export function DownloadButton({
       a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (e) {
-      alert(e instanceof Error ? e.message : '내려받기 실패')
+      setError(e instanceof Error ? e.message : '내려받기 실패')
     } finally {
       setBusy(false)
     }
   }
   return (
-    <button className={className} onClick={() => void download()} disabled={busy}>
-      {label ?? `${filename} 내려받기`}
-    </button>
+    <>
+      <button className={className} onClick={() => void download()} disabled={busy}>
+        {label ?? `${filename} 내려받기`}
+      </button>
+      {error && <span className="error small">{error}</span>}
+    </>
   )
 }

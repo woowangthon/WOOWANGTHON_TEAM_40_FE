@@ -1,16 +1,30 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
+import { api } from '../api'
 import { APP_NAME } from '../App'
 
 // 무엇을 기록하고 누가 보는지 밝히는 안내. 보조 프로그램의 동의 문구와 같은 내용을 담는다.
 export default function Privacy() {
+  // 지금 서버가 어느 AI API를 쓰는지 서버 설정에서 읽어 그대로 보여 준다
+  const [ai, setAi] = useState<{ provider: string; model: string } | null>(null)
+  useEffect(() => {
+    api
+      .health()
+      .then((h) => setAi({ provider: h.ai_provider === 'gemini' ? 'Google Gemini API' : 'Anthropic Claude API', model: h.model }))
+      .catch(() => setAi(null))
+  }, [])
+
   return (
     <div className="doc">
       <h1>개인정보와 기록 범위 안내</h1>
-      <p className="muted small">{APP_NAME}가 어떤 자료를 기록하고 누가 보며 어떻게 다루는지 적은 문서다. 2026년 11월 10일 기준이다.</p>
+      <p>{APP_NAME}가 어떤 자료를 기록하고 누가 보며 어떻게 다루는지 적은 문서다. 2026년 11월 12일 기준이다.</p>
 
       <h2>1. 계정 정보</h2>
       <p>회원가입 때 이메일, 이름, 역할을 받는다. 비밀번호는 해시로만 저장하고 원문은 저장하지 않는다. 이메일은 로그인과 교수 화면의 학생 구분에만 쓴다.</p>
+      <p>
+        Google이나 GitHub 계정으로 로그인하면 그 계정에서 확인된 이메일과 이름만 받는다. 그 계정의 비밀번호와 로그인에 쓴 토큰은 저장하지 않는다.
+      </p>
 
       <h2>2. 학습 과정에서 기록하는 것</h2>
       <ul>
@@ -37,10 +51,12 @@ export default function Privacy() {
 
       <h2>5. AI 처리</h2>
       <p>
-        질문과 답변, 결과물 텍스트, 교수가 올린 학습 자료의 일부가 AI 응답을 만들기 위해 서버에서 외부 AI API로 전송된다. 현재 Gemini 또는 Claude API를 쓰며
-        어느 쪽을 쓰는지는 서버 설정에 적혀 있다. 자체 모델이나 파인튜닝은 없고 전송한 내용을 학습에 쓰도록 허용하지 않는다. API 키가 없으면 AI 기능은 멈추고
-        고정된 결과를 보여 주지 않는다.
+        질문과 답변, 결과물 텍스트, 교수가 올린 학습 자료의 일부가 AI 응답을 만들기 위해 서버에서 외부 AI API로 전송된다. Google Gemini API 또는 Anthropic
+        Claude API를 쓰며 {ai ? `지금 이 서버가 쓰는 것은 ${ai.provider}의 ${ai.model}이다.` : '어느 쪽을 쓰는지는 서버 설정에 따른다.'} 자체 모델이나
+        파인튜닝은 없다. Gemini API를 무료 등급으로 쓰는 동안에는 전송한 내용이 Google의 제품 개선에 쓰일 수 있으므로 개인을 알아볼 수 있는 내용은 질문에 적지
+        않는다. API 키가 없으면 AI 기능은 멈추고 고정된 결과를 보여 주지 않는다.
       </p>
+      <p>AI는 위반 의심 신호를 표시할 뿐이고 최종 판단은 교수가 한다. AI가 채점한 서술형과 논술형 답도 교수가 확인해 점수를 고칠 수 있다.</p>
 
       <h2>6. 누가 보는가</h2>
       <p>
@@ -51,8 +67,10 @@ export default function Privacy() {
       <h2>7. 보관과 삭제</h2>
       <p>기록은 서비스 운영 기간 동안 서버에 보관한다. 학생이나 교수가 요청하면 해당 계정과 기록을 지운다. 대회 심사가 끝나면 시연용 자료는 정리한다.</p>
 
-      <p className="muted small" style={{ marginTop: 20 }}>
-        <Link to="/">처음으로</Link>
+      <p>
+        <Link className="link" to="/">
+          처음으로
+        </Link>
       </p>
     </div>
   )

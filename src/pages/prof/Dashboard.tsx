@@ -1,124 +1,141 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { LayoutGrid, List, Plus, Search } from 'lucide-react'
 
-import { api, formatDate, STAGE_LABEL, TOOL_LABEL, type Dashboard as DashboardData, type Stage } from '../../api'
+import type { DashboardRow } from '../../api'
+import { STATUS_LABEL, STATUS_TONE } from '../../nav'
+import { useProfHome } from '../../shells'
+import { ArtIcon, artOf, dateTime, HBar, Loading, Notice, PageHead, Status, Thumb, vars } from '../../ui'
 
-const STAGES: Stage[] = ['pre', 'learning', 'task', 'post', 'done']
+// 작성 중인 과제는 설정으로, 공개한 과제는 현황으로 연다.
+const hrefOf = (r: DashboardRow) => (r.status === 'draft' ? `/prof/assignments/${r.id}/setup/competencies` : `/prof/assignments/${r.id}`)
+const progress = (r: DashboardRow) => (r.enrollment_count ? `${r.enrollment_count}명 중 ${r.submitted_count}명 제출` : '학생 참여 전')
 
-// 교수 홈. 여러 과제의 진행과 채점 대기와 의심 신호를 한 번에 본다.
+// 교수 홈. 사이드바에서 고른 상태나 과목에 맞는 과제를 카드나 표로 보여 준다.
 export default function Dashboard() {
-  const [data, setData] = useState<DashboardData | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { data, error } = useProfHome()
+  const [sp] = useSearchParams()
+  const status = sp.get('status')
+  const course = sp.get('course')
+  const [q, setQ] = useState('')
+  const [view, setView] = useState<'grid' | 'list'>('grid')
 
-  const reload = useCallback(() => api.prof.dashboard().then(setData).catch((e: Error) => setError(e.message)), [])
-  useEffect(() => {
-    void reload()
-  }, [reload])
+  if (error && !data) {
+    return (
+      <div className="page">
+        <Notice kind="error">{error}</Notice>
+      </div>
+    )
+  }
+  if (!data) return <Loading />
 
-  if (error && !data) return <p className="error">{error}</p>
-  if (!data) return <p className="muted">불러오는 중</p>
+  const list = data.rows.filter((r) => (!status || r.status === status) && (!course || r.subject === course) && r.title.includes(q.trim()))
+  const title = status ? STATUS_LABEL[status as DashboardRow['status']] ?? '최근 과제' : (course ?? '최근 과제')
 
   return (
-    <div>
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <h1>교수 대시보드</h1>
-        <Link className="btn" to="/prof/assignments/new">
-          새 과제 만들기
+    <div className="page" key={`${status}${course}`}>
+      <PageHead title={title}>
+        <Link className="btn primary" to="/prof/assignments/new">
+          <Plus aria-hidden="true" />
+          과제 만들기
         </Link>
+      </PageHead>
+      <div className="toolbar">
+        <div className="search">
+          <Search aria-hidden="true" />
+          <input className="input" placeholder="과제 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="과제 검색" />
+        </div>
+        <div className="actions">
+          <div className="seg" role="group" aria-label="보기 방식">
+            <button type="button" aria-pressed={view === 'grid'} aria-label="카드로 보기" onClick={() => setView('grid')}>
+              <LayoutGrid aria-hidden="true" />
+            </button>
+            <button type="button" aria-pressed={view === 'list'} aria-label="표로 보기" onClick={() => setView('list')}>
+              <List aria-hidden="true" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="stat-grid">
-        <Stat label="과제" value={`${data.assignment_count}개`} sub={`공개 중 ${data.open_count}개`} />
-        <Stat label="참여 학생" value={`${data.student_count}명`} />
-        <Stat label="채점 대기" value={`${data.ungraded_count}명`} sub="제출했지만 점수가 없는 학생" warn={data.ungraded_count > 0} />
-        <Stat label="의심 신호" value={`${data.signal_count}건`} sub="AI가 표시한 것, 판단은 교수" warn={data.signal_count > 0} />
-      </div>
+      {list.length === 0 && (
+        <div className="rows">
+          <div className="empty">
+            {data.rows.length === 0 ? (
+              <>
+                아직 과제가 없다.{' '}
+                <Link className="link" to="/prof/assignments/new">
+                  첫 과제를 만든다
+                </Link>
+              </>
+            ) : (
+              '조건에 맞는 과제가 없다'
+            )}
+          </div>
+        </div>
+      )}
 
-      <div className="card">
-        <h2>과제별 진행</h2>
-        {data.rows.length === 0 ? (
-          <p className="muted">
-            아직 과제가 없다. <Link to="/prof/assignments/new">첫 과제를 만든다.</Link>
-          </p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>과제</th>
-                <th>상태</th>
-                <th>단계 분포</th>
-                <th>제출</th>
-                <th>채점 대기</th>
-                <th>의심 신호</th>
-                <th>마감</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((r) => {
-                const total = STAGES.reduce((n, s) => n + (r.stage_counts[s] ?? 0), 0)
-                return (
-                  <tr key={r.id}>
-                    <td>
-                      <Link to={`/prof/assignments/${r.id}`}>{r.title}</Link>
-                      <div className="muted small">
-                        {r.subject} · 자리 {r.tool_slot} · {TOOL_LABEL[r.tool_name] ?? r.tool_name} · 코드 <code>{r.join_code}</code>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`chip ${r.status === 'open' ? 'chip-ok' : ''}`}>
-                        {r.status === 'open' ? '공개' : r.status === 'closed' ? '마감' : '작성 중'}
-                      </span>
-                    </td>
-                    <td style={{ minWidth: 220 }}>
-                      {total === 0 ? (
-                        <span className="muted small">참여 없음</span>
-                      ) : (
-                        <>
-                          <div className="stage-bar">
-                            {STAGES.map((s) => (
-                              <span key={s} className={`seg seg-${s}`} style={{ flex: r.stage_counts[s] ?? 0 }} title={`${STAGE_LABEL[s]} ${r.stage_counts[s] ?? 0}명`} />
-                            ))}
-                          </div>
-                          <div className="muted small">
-                            {STAGES.filter((s) => (r.stage_counts[s] ?? 0) > 0)
-                              .map((s) => `${STAGE_LABEL[s]} ${r.stage_counts[s]}`)
-                              .join(', ')}
-                          </div>
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      {r.submitted_count}/{r.enrollment_count}
-                    </td>
-                    <td>{r.ungraded_count > 0 ? <span className="chip chip-warn">{r.ungraded_count}명</span> : '-'}</td>
-                    <td>{r.signal_count > 0 ? <span className="chip chip-warn">{r.signal_count}건</span> : '-'}</td>
-                    <td className="small">{formatDate(r.deadline)}</td>
-                    <td className="row" style={{ flexWrap: 'nowrap' }}>
-                      <Link className="btn btn-secondary btn-sm" to={`/prof/assignments/${r.id}`}>
-                        현황
-                      </Link>
-                      <Link className="btn btn-ghost btn-sm" to={`/prof/assignments/${r.id}/setup/competencies`}>
-                        설정
+      {view === 'grid' ? (
+        <div className="grid">
+          {list.map((r, i) => (
+            <Link key={r.id} to={hrefOf(r)} className="card" style={vars({ '--i': i })}>
+              <Thumb kind={artOf(r.tool_name)} />
+              <div className="foot">
+                <div className="line">
+                  <span className="title">
+                    <ArtIcon kind={artOf(r.tool_name)} />
+                    <span>{r.title}</span>
+                  </span>
+                  <Status tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Status>
+                </div>
+                <div className="line">
+                  <div style={{ flex: 1 }}>
+                    <HBar value={r.submitted_count} max={r.enrollment_count || 1} i={i} />
+                  </div>
+                  <span className="num">{progress(r)}</span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        list.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>과제</th>
+                  <th>과목</th>
+                  <th>상태</th>
+                  <th>마감</th>
+                  <th className="r">제출</th>
+                  <th className="r">채점 대기</th>
+                  <th className="r">의심 신호</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((r) => (
+                  <tr key={r.id} className="go">
+                    <td className="strong">
+                      <Link to={hrefOf(r)} className="with-ico">
+                        <ArtIcon kind={artOf(r.tool_name)} />
+                        {r.title}
                       </Link>
                     </td>
+                    <td>{r.subject}</td>
+                    <td>
+                      <Status tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Status>
+                    </td>
+                    <td className="num">{r.deadline ? dateTime(r.deadline) : '정하지 않음'}</td>
+                    <td className="r">{progress(r)}</td>
+                    <td className="r">{r.ungraded_count ? `${r.ungraded_count}명` : ''}</td>
+                    <td className="r">{r.signal_count ? `${r.signal_count}건` : ''}</td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Stat({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {
-  return (
-    <div className={`stat ${warn ? 'stat-warn' : ''}`}>
-      <div className="muted small">{label}</div>
-      <div className="stat-value">{value}</div>
-      {sub && <div className="muted small">{sub}</div>}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
     </div>
   )
 }

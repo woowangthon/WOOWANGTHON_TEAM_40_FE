@@ -1,0 +1,146 @@
+/* 과제 현황과 학생 기록 화면에서만 쓰는 규칙. 색과 선은 design.css 의 토큰만 쓴다.
+   모든 규칙을 prof-status 아래에 두어 다른 화면에는 닿지 않게 한다. */
+@scope (:root) to (.legacy) {
+  /* 목록 줄 오른쪽의 값. 막대 옆에서 자리 폭을 맞춘다. */
+  .prof-status .row .val {
+    width: 48px;
+    flex: none;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .prof-status .row .val.wide {
+    width: 136px;
+  }
+
+  .prof-status .row .bars {
+    display: grid;
+    gap: 4px;
+  }
+
+  .prof-status .row .who {
+    flex: none;
+    font-weight: 600;
+  }
+
+  .prof-status .row .line {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+
+  /* 표 */
+  .prof-status .table td.act {
+    width: 40px;
+  }
+
+  .prof-status .table .nowrap {
+    white-space: nowrap;
+  }
+
+  .prof-status .table td.text {
+    min-width: 160px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* 펼치고 닫을 때 글자가 바뀌어도 표의 칸 폭이 흔들리지 않게 한다. */
+  .prof-status .table .btn.toggle {
+    min-width: 84px;
+  }
+
+  /* 답안 줄 아래에 펼치는 정답과 채점 확인 */
+  .prof-status .table tr.detail > td {
+    height: auto;
+    padding: 14px 16px 16px;
+  }
+
+  .prof-status .ans.wide {
+    grid-template-columns: 136px minmax(0, 1fr);
+  }
+
+  .prof-status .ans.wide dd {
+    white-space: pre-wrap;
+  }
+
+  .prof-status .override {
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  .prof-status .override .grow {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .prof-status .override + .error-text {
+    margin-top: 8px;
+  }
+
+  .prof-status .grade-form {
+    max-width: 640px;
+  }
+
+  .prof-status .meta + .table-wrap,
+  .prof-status .meta + .rows {
+    margin-top: 12px;
+  }
+
+  /* 학생 기록의 탭. 좁은 창에서는 옆으로 민다. */
+  .prof-status .tabs.fit {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .prof-status .tabs.fit .tab {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* 대화 기록. 시각, 단계, 말한 쪽, 내용 순서다. */
+  .prof-status .log.talk .log-row {
+    grid-template-columns: 112px 96px minmax(0, 1fr);
+  }
+
+  .prof-status .log.talk.staged .log-row {
+    grid-template-columns: 112px 84px 96px minmax(0, 1fr);
+  }
+
+  .prof-status .log.talk .who {
+    font-weight: 600;
+  }
+
+  .prof-status .log.talk .text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 960px) {
+    .prof-status .row .val.wide {
+      width: auto;
+    }
+
+    .prof-status .ans.wide {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2px;
+    }
+
+    .prof-status .ans.wide dd {
+      margin-bottom: 8px;
+    }
+
+    .prof-status .log.talk .log-row,
+    .prof-status .log.talk.staged .log-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px 12px;
+      padding: 10px 12px;
+    }
+
+    .prof-status .log.talk .text {
+      flex: 1 1 100%;
+    }
+  }
+}

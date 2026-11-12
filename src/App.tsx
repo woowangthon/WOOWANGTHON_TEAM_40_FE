@@ -1,17 +1,17 @@
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 
 import { useAuth } from './auth'
-import ErrorBoundary from './components/ErrorBoundary'
+import { homePath } from './nav'
 import CompanionPanel from './pages/CompanionPanel'
-import Landing from './pages/Landing'
 import LoginPage from './pages/LoginPage'
 import NotFound from './pages/NotFound'
 import Privacy from './pages/Privacy'
-import AssignmentOverview from './pages/prof/AssignmentOverview'
+import SocialCallback from './pages/SocialCallback'
 import Dashboard from './pages/prof/Dashboard'
 import NewAssignment from './pages/prof/NewAssignment'
 import SetupLayout from './pages/prof/setup/SetupLayout'
 import { CompetenciesPage, MaterialsPage, PublishPage, RulesPage, TaskPage as SetupTaskPage, TestsPage, ToolsPage } from './pages/prof/setup/SetupPages'
+import { StatusLayout, StatusLearning, StatusOverview, StatusPost, StatusPre, StatusStudents, StatusTask } from './pages/prof/status/StatusPages'
 import StudentLayout from './pages/prof/student/StudentLayout'
 import { ConversationTab, LearningTab, OverviewTab, TaskTab, TestsTab } from './pages/prof/student/StudentTabs'
 import ChatPopout from './pages/stu/ChatPopout'
@@ -20,165 +20,144 @@ import EnrollmentOverview from './pages/stu/EnrollmentOverview'
 import ResultSummary from './pages/stu/ResultSummary'
 import { LearningPage, PostPage, PrePage, TaskPage } from './pages/stu/StagePages'
 import StudentHome from './pages/stu/StudentHome'
+import { AssignmentShell, ProfHomeShell, PublicFrame, StuHomeShell } from './shells'
+import { Loading } from './ui'
 
-export const APP_NAME = '학습 도우미'
+export { APP_NAME, homePath } from './nav'
 
-function Shell({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth()
-  return (
-    <div className="shell">
-      <header className="topbar">
-        <Link to="/" className="brand">
-          {APP_NAME}
-          <span className="brand-sub">서비스 이름 미정</span>
-        </Link>
-        {user ? (
-          <div className="topbar-user">
-            <Link to={user.role === 'professor' ? '/prof' : '/stu'} className="small">
-              {user.role === 'professor' ? '대시보드' : '내 과제'}
-            </Link>
-            <span className={`role-chip role-${user.role}`}>{user.role === 'professor' ? '교수' : '학생'}</span>
-            <span>{user.name}</span>
-            <button className="btn btn-ghost" onClick={logout}>
-              로그아웃
-            </button>
-          </div>
-        ) : (
-          <div className="topbar-user">
-            <Link className="btn btn-ghost" to="/login">
-              로그인
-            </Link>
-            <Link className="btn btn-secondary" to="/signup">
-              회원가입
-            </Link>
-          </div>
-        )}
-      </header>
-      <main className="content">
-        <ErrorBoundary>{children}</ErrorBoundary>
-      </main>
-      <footer className="footer">
-        <span>{APP_NAME}, AI 우왕톤 40팀 우왕우왕</span>
-        <Link to="/privacy">개인정보와 기록 범위 안내</Link>
-      </footer>
-    </div>
-  )
+// 첫 주소. 로그인한 사람은 역할별 홈으로, 아니면 로그인으로 보낸다.
+function HomeRedirect() {
+  const { user, loading } = useAuth()
+  if (loading) return <Loading />
+  return <Navigate to={user ? homePath(user.role) : '/login'} replace />
 }
 
 function RequireRole({ role, children }: { role: 'professor' | 'student'; children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const location = useLocation()
-  if (loading) return <p className="muted">불러오는 중</p>
+  if (loading) return <Loading />
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />
-  if (user.role !== role) return <Navigate to="/" replace />
+  if (user.role !== role) return <Navigate to={homePath(user.role)} replace />
   return <>{children}</>
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/companion-panel/:eid" element={<CompanionPanel />} />
-      <Route path="/stu/enrollments/:eid/chat" element={<ChatPopout />} />
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="/login" element={<LoginPage initialMode="login" />} />
+      <Route path="/signup" element={<LoginPage initialMode="signup" />} />
+      <Route path="/login/social" element={<SocialCallback />} />
+      <Route
+        path="/privacy"
+        element={
+          <PublicFrame>
+            <Privacy />
+          </PublicFrame>
+        }
+      />
+
+      {/* 팀원이 만든 과제 단계의 별도 창. 예전 스타일을 그대로 쓰도록 legacy 영역으로 감싼다. */}
+      <Route
+        path="/companion-panel/:eid"
+        element={
+          <div className="legacy legacy-page">
+            <CompanionPanel />
+          </div>
+        }
+      />
+      <Route
+        path="/stu/enrollments/:eid/chat"
+        element={
+          <div className="legacy legacy-page">
+            <ChatPopout />
+          </div>
+        }
+      />
+
+      <Route
+        path="/prof"
+        element={
+          <RequireRole role="professor">
+            <ProfHomeShell />
+          </RequireRole>
+        }
+      >
+        <Route index element={<Dashboard />} />
+        <Route path="assignments/new" element={<NewAssignment />} />
+      </Route>
+
+      <Route
+        path="/prof/assignments/:id"
+        element={
+          <RequireRole role="professor">
+            <AssignmentShell />
+          </RequireRole>
+        }
+      >
+        {/* 과제 현황. 반 전체 지표를 단계별 하위 페이지로 나눈다. */}
+        <Route element={<StatusLayout />}>
+          <Route index element={<StatusOverview />} />
+          <Route path="pre" element={<StatusPre />} />
+          <Route path="learning" element={<StatusLearning />} />
+          <Route path="task" element={<StatusTask />} />
+          <Route path="post" element={<StatusPost />} />
+          <Route path="students" element={<StatusStudents />} />
+        </Route>
+        {/* 학생 한 명의 기록 */}
+        <Route path="students/:eid" element={<StudentLayout />}>
+          <Route index element={<OverviewTab />} />
+          <Route path="tests" element={<TestsTab />} />
+          <Route path="learning" element={<LearningTab />} />
+          <Route path="task" element={<TaskTab />} />
+          <Route path="conversation" element={<ConversationTab />} />
+        </Route>
+        {/* 과제 설정 일곱 구역 */}
+        <Route path="setup" element={<SetupLayout />}>
+          <Route index element={<Navigate to="competencies" replace />} />
+          <Route path="competencies" element={<CompetenciesPage />} />
+          <Route path="tests" element={<TestsPage />} />
+          <Route path="task" element={<SetupTaskPage />} />
+          <Route path="materials" element={<MaterialsPage />} />
+          <Route path="rules" element={<RulesPage />} />
+          <Route path="tools" element={<ToolsPage />} />
+          <Route path="publish" element={<PublishPage />} />
+        </Route>
+      </Route>
+
+      <Route
+        path="/stu"
+        element={
+          <RequireRole role="student">
+            <StuHomeShell />
+          </RequireRole>
+        }
+      >
+        <Route index element={<StudentHome />} />
+      </Route>
+
+      <Route
+        path="/stu/enrollments/:eid"
+        element={
+          <RequireRole role="student">
+            <EnrollmentLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<EnrollmentOverview />} />
+        <Route path="pre" element={<PrePage />} />
+        <Route path="learning" element={<LearningPage />} />
+        <Route path="task" element={<TaskPage />} />
+        <Route path="post" element={<PostPage />} />
+        <Route path="result" element={<ResultSummary />} />
+      </Route>
+
       <Route
         path="*"
         element={
-          <Shell>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<LoginPage initialMode="login" />} />
-              <Route path="/signup" element={<LoginPage initialMode="signup" />} />
-              <Route path="/privacy" element={<Privacy />} />
-
-              <Route
-                path="/prof"
-                element={
-                  <RequireRole role="professor">
-                    <Dashboard />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/prof/assignments/new"
-                element={
-                  <RequireRole role="professor">
-                    <NewAssignment />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/prof/assignments/:id"
-                element={
-                  <RequireRole role="professor">
-                    <AssignmentOverview />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/prof/assignments/:id/setup"
-                element={
-                  <RequireRole role="professor">
-                    <SetupLayout />
-                  </RequireRole>
-                }
-              >
-                <Route index element={<Navigate to="competencies" replace />} />
-                <Route path="competencies" element={<CompetenciesPage />} />
-                <Route path="tests" element={<TestsPage />} />
-                <Route path="task" element={<SetupTaskPage />} />
-                <Route path="materials" element={<MaterialsPage />} />
-                <Route path="rules" element={<RulesPage />} />
-                <Route path="tools" element={<ToolsPage />} />
-                <Route path="publish" element={<PublishPage />} />
-              </Route>
-              <Route
-                path="/prof/assignments/:id/students/:eid"
-                element={
-                  <RequireRole role="professor">
-                    <StudentLayout />
-                  </RequireRole>
-                }
-              >
-                <Route index element={<OverviewTab />} />
-                <Route path="tests" element={<TestsTab />} />
-                <Route path="learning" element={<LearningTab />} />
-                <Route path="task" element={<TaskTab />} />
-                <Route path="conversation" element={<ConversationTab />} />
-              </Route>
-
-              <Route
-                path="/stu"
-                element={
-                  <RequireRole role="student">
-                    <StudentHome />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/stu/enrollments/:eid/result"
-                element={
-                  <RequireRole role="student">
-                    <ResultSummary />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="/stu/enrollments/:eid"
-                element={
-                  <RequireRole role="student">
-                    <EnrollmentLayout />
-                  </RequireRole>
-                }
-              >
-                <Route index element={<EnrollmentOverview />} />
-                <Route path="pre" element={<PrePage />} />
-                <Route path="learning" element={<LearningPage />} />
-                <Route path="task" element={<TaskPage />} />
-                <Route path="post" element={<PostPage />} />
-              </Route>
-
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Shell>
+          <PublicFrame>
+            <NotFound />
+          </PublicFrame>
         }
       />
     </Routes>

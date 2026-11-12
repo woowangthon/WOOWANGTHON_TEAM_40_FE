@@ -1,22 +1,27 @@
+import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { STAGE_LABEL, type Stage } from '../../api'
+import { PageHead } from '../../ui'
 import { currentStagePath, stageOpen, useEnrollment } from './EnrollmentLayout'
 import LearningStage from './LearningStage'
 import TaskStage from './TaskStage'
 import TestStage from './TestStage'
 
 // 아직 열리지 않은 단계로 들어오면 현재 단계로 안내한다.
-function StageGate({ target, children }: { target: Stage; children: React.ReactNode }) {
+function StageGate({ target, children }: { target: Stage; children: ReactNode }) {
   const { e } = useEnrollment()
   if (stageOpen(e.stage, target)) return <>{children}</>
   return (
-    <div className="card">
-      <h2>{STAGE_LABEL[target]} 단계는 아직 열리지 않았다</h2>
-      <p className="muted small">현재 단계는 {STAGE_LABEL[e.stage]}이다. 순서대로 진행하면 열린다.</p>
-      <Link className="btn" to={`/stu/enrollments/${e.id}/${currentStagePath(e.stage)}`}>
-        {STAGE_LABEL[e.stage]} 단계로
-      </Link>
+    <div className="page narrow">
+      <PageHead title={STAGE_LABEL[target]}>
+        <Link className="btn primary" to={`/stu/enrollments/${e.id}/${currentStagePath(e.stage)}`}>
+          {STAGE_LABEL[e.stage]} 단계로
+        </Link>
+      </PageHead>
+      <div className="note">
+        {STAGE_LABEL[target]} 단계는 아직 열리지 않았다. 현재 단계는 {STAGE_LABEL[e.stage]}이다
+      </div>
     </div>
   )
 }
@@ -46,20 +51,25 @@ export function LearningPage() {
   )
 }
 
+// 과제 단계 화면은 팀원이 만든다. 예전 스타일시트가 적용되도록 legacy 영역으로 감싼다.
 export function TaskPage() {
   const { e, reload, setNotice } = useEnrollment()
   const navigate = useNavigate()
   return (
     <StageGate target="task">
-      <TaskStage
-        enrollment={e}
-        onChanged={(notice) => {
-          if (notice) setNotice(notice)
-          void reload().then((en) => {
-            if (en.stage === 'post' && e.stage === 'task') navigate(`/stu/enrollments/${e.id}/post`)
-          })
-        }}
-      />
+      <div className="task-frame">
+        <div className="legacy">
+          <TaskStage
+            enrollment={e}
+            onChanged={(notice) => {
+              if (notice) setNotice(notice)
+              void reload().then((en) => {
+                if (en.stage === 'post' && e.stage === 'task') navigate(`/stu/enrollments/${e.id}/post`)
+              })
+            }}
+          />
+        </div>
+      </div>
     </StageGate>
   )
 }

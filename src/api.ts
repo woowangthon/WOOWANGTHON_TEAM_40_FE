@@ -5,6 +5,7 @@ export type Stage = 'pre' | 'learning' | 'task' | 'post' | 'done'
 export type Phase = 'pre' | 'post'
 export type ItemType = 'choice' | 'short' | 'fill' | 'essay_short' | 'essay_long'
 export type RuleTarget = 'ai' | 'student' | 'both'
+export type SocialProvider = 'google' | 'github'
 
 export interface User {
   id: number
@@ -115,6 +116,7 @@ export interface AssignmentStudentView {
   competencies: { id: number; name: string; description: string; pass_score: number }[]
   student_rules: string[]
   material_names: string[]
+  materials: { id: number; filename: string; size: number }[]
   professor_name: string
 }
 
@@ -159,6 +161,7 @@ export interface Enrollment {
   assignment: AssignmentStudentView
   states: CompetencyState[]
   attempts: TaskAttempt[]
+  grade: Grade | null
 }
 
 export interface EnrollmentBrief {
@@ -196,6 +199,15 @@ export interface TestAnswer {
   rationale: string
   graded_by: string
   expected_answer: string | null
+  // 채점 근거. 출처가 교수 채점 기준인지 학습 자료인지 AI 판단인지 구분한다.
+  basis: AnswerBasis[]
+  // 답안 가운데 틀렸다고 본 부분. 답안에 있는 문장을 그대로 옮긴 것이다.
+  wrong_spans: string[]
+}
+
+export interface AnswerBasis {
+  source: 'criteria' | 'material' | 'ai'
+  text: string
 }
 
 export interface TestResult {
@@ -321,11 +333,47 @@ export interface OverviewRow {
   signal_count: number
   grade_score: number | null
   last_submitted_at: string | null
+  pre_scores: (number | null)[]
+  weak_competencies: string[]
+  gain: number | null
+  learning_messages: number
+  submitted: boolean
+}
+
+export interface CompetencyClassStat {
+  competency_id: number
+  name: string
+  pass_score: number
+  pre_avg: number | null
+  current_avg: number | null
+  post_avg: number | null
+  below_count: number
+  learning_count: number
+}
+
+export interface ClassStats {
+  enrolled: number
+  pre_taken: number
+  pre_avg: number | null
+  pre_min: number | null
+  pre_max: number | null
+  pre_distribution: number[]
+  post_taken: number
+  post_avg: number | null
+  gain_avg: number | null
+  dropped_count: number
+  not_started: number
+  learning_now: number
+  learning_done: number
+  submitted_count: number
+  graded_count: number
+  competencies: CompetencyClassStat[]
 }
 
 export interface Overview {
   assignment: AssignmentBrief
   stage_counts: Record<string, number>
+  stats: ClassStats
   rows: OverviewRow[]
 }
 
@@ -459,13 +507,23 @@ export async function fetchBlobUrl(path: string, companionToken?: string): Promi
 }
 
 export const api = {
-  health: () => request<{ ok: boolean; ai_available: boolean; model: string }>('GET', '/api/health'),
+  health: () =>
+    request<{ ok: boolean; ai_available: boolean; ai_provider: string; model: string; google_available: boolean; companion_download: boolean }>(
+      'GET',
+      '/api/health',
+    ),
   auth: {
     signup: (body: { email: string; password: string; name: string; role: Role }) =>
       request<{ token: string; user: User }>('POST', '/api/auth/signup', { body }),
     login: (body: { email: string; password: string }) =>
       request<{ token: string; user: User }>('POST', '/api/auth/login', { body }),
     me: () => request<User>('GET', '/api/auth/me'),
+    // 서버에 키가 설정된 소셜 로그인 공급자 목록. 비어 있으면 화면에 버튼을 내지 않는다.
+    socialProviders: () => request<{ providers: SocialProvider[] }>('GET', '/api/auth/social/providers'),
+    socialStart: (provider: SocialProvider, body: { mode: 'login' | 'signup'; role?: Role }) =>
+      request<{ url: string }>('POST', `/api/auth/social/${provider}/start`, { body }),
+    socialExchange: (ticket: string) =>
+      request<{ token: string; user: User }>('POST', '/api/auth/social/exchange', { body: { ticket } }),
   },
   prof: {
     list: () => request<AssignmentBrief[]>('GET', '/api/assignments'),
@@ -519,6 +577,7 @@ export const api = {
     materialPath: (eid: number, mid: number) => `/api/enrollments/${eid}/materials/${mid}/file`,
     testStart: (eid: number, phase: Phase) =>
       request<TestStart>('POST', `/api/enrollments/${eid}/tests/${phase}/start`),
+    testOpen: (eid: number, phase: Phase) => request<TestStart>('GET', `/api/enrollments/${eid}/tests/${phase}/open`),
     testSubmit: (eid: number, phase: Phase, answers: { item_id: number; answer: string }[]) =>
       request<TestResult>('POST', `/api/enrollments/${eid}/tests/${phase}/submit`, { body: { answers } }),
     testResult: (eid: number, phase: Phase) =>

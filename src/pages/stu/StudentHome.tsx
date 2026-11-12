@@ -1,109 +1,130 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { LayoutGrid, List, Search } from 'lucide-react'
 
-import { api, formatDate, STAGE_LABEL, TOOL_LABEL, type EnrollmentBrief } from '../../api'
+import { STAGE_LABEL, type EnrollmentBrief, type Stage } from '../../api'
+import { useStuHome } from '../../shells'
+import { ArtIcon, artOf, dateTime, Loading, monthDay, Notice, PageHead, Status, Thumb, vars } from '../../ui'
 
+const ORDER: Stage[] = ['pre', 'learning', 'task', 'post', 'done']
+// 완료한 과제는 결과 요약으로, 진행 중인 과제는 과제 개요로 연다.
+const hrefOf = (r: EnrollmentBrief) => (r.stage === 'done' ? `/stu/enrollments/${r.id}/result` : `/stu/enrollments/${r.id}`)
+
+// 학생 홈. 참여한 과제를 카드나 표로 보여 준다. 과제 코드로 참여하는 입력은 사이드바에 있다.
 export default function StudentHome() {
-  const [rows, setRows] = useState<EnrollmentBrief[] | null>(null)
-  const [tab, setTab] = useState<'active' | 'done'>('active')
-  const [code, setCode] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const navigate = useNavigate()
+  const { rows, error } = useStuHome()
+  const [sp] = useSearchParams()
+  const state = sp.get('state')
+  const course = sp.get('course')
+  const [q, setQ] = useState('')
+  const [view, setView] = useState<'grid' | 'list'>('grid')
 
-  useEffect(() => {
-    api.stu.list().then(setRows).catch((e: Error) => setError(e.message))
-  }, [])
-
-  async function join(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    try {
-      const en = await api.stu.join(code.trim())
-      navigate(`/stu/enrollments/${en.id}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '참여 실패')
-    }
+  if (error && !rows) {
+    return (
+      <div className="page">
+        <Notice kind="error">{error}</Notice>
+      </div>
+    )
   }
+  if (!rows) return <Loading />
 
-  const active = (rows ?? []).filter((r) => r.stage !== 'done')
-  const done = (rows ?? []).filter((r) => r.stage === 'done')
-  const shown = tab === 'active' ? active : done
+  const list = rows.filter(
+    (r) => (!state || (state === 'done') === (r.stage === 'done')) && (!course || r.subject === course) && r.title.includes(q.trim()),
+  )
+  const title = state === 'done' ? '완료' : state === 'active' ? '진행 중' : (course ?? '최근 과제')
 
   return (
-    <div>
-      <h1>내 과제</h1>
-      <div className="card">
-        <h2>과제 참여</h2>
-        <p className="muted small">교수가 알려 준 참여 코드를 입력한다. 참여하면 과제 개요를 읽고 사전평가부터 시작한다.</p>
-        <form className="row" onSubmit={(e) => void join(e)}>
-          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="참여 코드" style={{ maxWidth: 200 }} required />
-          <button className="btn" type="submit">
-            참여
-          </button>
-        </form>
-        {error && <p className="error small">{error}</p>}
-      </div>
-      <div className="card">
-        <div className="card-title">
-          <h2>참여한 과제</h2>
-          <div className="section-nav" style={{ margin: 0 }}>
-            <button className={tab === 'active' ? 'active' : ''} onClick={() => setTab('active')}>
-              진행 중 {active.length}
+    <div className="page" key={`${state}${course}`}>
+      <PageHead title={title} />
+      <div className="toolbar">
+        <div className="search">
+          <Search aria-hidden="true" />
+          <input className="input" placeholder="과제 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="과제 검색" />
+        </div>
+        <div className="actions">
+          <div className="seg" role="group" aria-label="보기 방식">
+            <button type="button" aria-pressed={view === 'grid'} aria-label="카드로 보기" onClick={() => setView('grid')}>
+              <LayoutGrid aria-hidden="true" />
             </button>
-            <button className={tab === 'done' ? 'active' : ''} onClick={() => setTab('done')}>
-              완료 {done.length}
+            <button type="button" aria-pressed={view === 'list'} aria-label="표로 보기" onClick={() => setView('list')}>
+              <List aria-hidden="true" />
             </button>
           </div>
         </div>
-        {rows === null ? (
-          <p className="muted">불러오는 중</p>
-        ) : shown.length === 0 ? (
-          <p className="muted">{tab === 'active' ? '진행 중인 과제가 없다.' : '완료한 과제가 없다.'}</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>과제</th>
-                <th>과목</th>
-                <th>교수</th>
-                <th>도구</th>
-                <th>마감</th>
-                <th>단계</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <Link to={`/stu/enrollments/${r.id}`}>{r.title}</Link>
-                  </td>
-                  <td>{r.subject}</td>
-                  <td>{r.professor_name}</td>
-                  <td className="small">{TOOL_LABEL[r.tool_name] ?? r.tool_name}</td>
-                  <td>
-                    {formatDate(r.deadline)} {r.deadline_passed && <span className="chip chip-bad">마감 지남</span>}
-                  </td>
-                  <td>
-                    <span className="chip chip-primary">{STAGE_LABEL[r.stage]}</span>
-                  </td>
-                  <td>
-                    {r.stage === 'done' ? (
-                      <Link className="btn btn-secondary btn-sm" to={`/stu/enrollments/${r.id}/result`}>
-                        결과 요약
-                      </Link>
-                    ) : (
-                      <Link className="btn btn-secondary btn-sm" to={`/stu/enrollments/${r.id}/${r.stage}`}>
-                        이어서 하기
-                      </Link>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
+
+      {list.length === 0 && (
+        <div className="rows">
+          <div className="empty">{rows.length === 0 ? '아직 참여한 과제가 없다. 왼쪽 아래에서 과제 코드로 참여한다' : '조건에 맞는 과제가 없다'}</div>
+        </div>
+      )}
+
+      {view === 'grid' ? (
+        <div className="grid">
+          {list.map((r, i) => {
+            const at = ORDER.indexOf(r.stage)
+            return (
+              <Link key={r.id} to={hrefOf(r)} className="card" style={vars({ '--i': i })}>
+                <Thumb kind={artOf(r.tool_name)} />
+                <div className="foot">
+                  <div className="line">
+                    <span className="title">
+                      <ArtIcon kind={artOf(r.tool_name)} />
+                      <span>{r.title}</span>
+                    </span>
+                    <span className="num">{r.deadline ? `${monthDay(r.deadline)} 마감` : ''}</span>
+                  </div>
+                  <div className="line">
+                    <div className="steps" aria-hidden="true">
+                      {ORDER.slice(0, 4).map((s, k) => (
+                        <span key={s} className={k < at ? 'done' : k === at ? 'now' : ''} />
+                      ))}
+                    </div>
+                    <span>{STAGE_LABEL[r.stage]}</span>
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      ) : (
+        list.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>과제</th>
+                  <th>과목</th>
+                  <th>교수</th>
+                  <th>현재 단계</th>
+                  <th>마감</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((r) => (
+                  <tr key={r.id} className="go">
+                    <td className="strong">
+                      <Link to={hrefOf(r)} className="with-ico">
+                        <ArtIcon kind={artOf(r.tool_name)} />
+                        {r.title}
+                      </Link>
+                    </td>
+                    <td>{r.subject}</td>
+                    <td>{r.professor_name}</td>
+                    <td>
+                      <Status tone={r.stage === 'done' ? 'done' : 'doing'}>{STAGE_LABEL[r.stage]}</Status>
+                    </td>
+                    <td className="num">
+                      {r.deadline ? dateTime(r.deadline) : ''}
+                      {r.deadline_passed ? ' 마감 지남' : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
     </div>
   )
 }

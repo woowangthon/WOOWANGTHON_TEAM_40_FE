@@ -19,16 +19,18 @@ export default class ErrorBoundary extends Component<{ children: ReactNode }, St
   render() {
     if (!this.state.error) return this.props.children
     return (
-      <div className="card" style={{ maxWidth: 560, margin: '60px auto' }}>
-        <h1>화면을 그리다 문제가 생겼다</h1>
-        <p className="muted small">{this.state.error.message}</p>
-        <div className="row">
-          <button className="btn" onClick={() => window.location.reload()}>
-            다시 불러오기
-          </button>
-          <a className="btn btn-ghost" href="/">
-            처음으로
-          </a>
+      <div className="auth">
+        <div className="auth-box">
+          <h1>화면을 그리다 문제가 생겼다</h1>
+          <p>{this.state.error.message}</p>
+          <div className="inline">
+            <button type="button" className="btn primary" onClick={() => window.location.reload()}>
+              다시 불러오기
+            </button>
+            <a className="btn" href="/">
+              처음으로
+            </a>
+          </div>
         </div>
       </div>
     )

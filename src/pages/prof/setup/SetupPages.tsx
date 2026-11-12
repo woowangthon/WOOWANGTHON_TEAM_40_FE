@@ -1,91 +1,84 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 
-import { api } from '../../../api'
-import {
-  BasicSection,
-  CompetencySection,
-  ItemsSection,
-  MaterialsSection,
-  RulesSection,
-  TaskProblemSection,
-  ToolSection,
-} from '../setupSections'
-import { SECTIONS, sectionDone, useSetup } from './SetupLayout'
+import { api, TOOL_LABEL, type Assignment } from '../../../api'
+import { sectionDone, setupNav, STATUS_LABEL, STATUS_TONE } from '../../../nav'
+import { CopyButton, dateTime, Notice, Section, Status, type Tone } from '../../../ui'
+import { CompetenciesSection, Foot, MaterialsSection, RulesSection, TaskProblemSection, TestsSection, ToolSection } from '../setupSections'
+import { useSetup } from './SetupLayout'
 
 export function CompetenciesPage() {
   const { a, setA, reload, notify } = useSetup()
-  return (
-    <>
-      <BasicSection a={a} onSaved={setA} notify={notify} />
-      <CompetencySection a={a} onSaved={() => void reload()} notify={notify} />
-      <NextLink to="tests" />
-    </>
-  )
+  return <CompetenciesSection a={a} setA={setA} reload={reload} notify={notify} />
 }
 
 export function TestsPage() {
-  const { a, reload, notify } = useSetup()
-  const [phase, setPhase] = useState<'pre' | 'post'>('pre')
-  return (
-    <>
-      <div className="section-nav">
-        <button className={phase === 'pre' ? 'active' : ''} onClick={() => setPhase('pre')}>
-          사전평가 문항
-        </button>
-        <button className={phase === 'post' ? 'active' : ''} onClick={() => setPhase('post')}>
-          사후평가 문항
-        </button>
-      </div>
-      <ItemsSection key={phase} a={a} phase={phase} onSaved={() => void reload()} notify={notify} />
-      <NextLink to="task" />
-    </>
-  )
+  const { a, setA, reload, notify } = useSetup()
+  return <TestsSection a={a} setA={setA} reload={reload} notify={notify} />
 }
 
 export function TaskPage() {
   const { a, setA, notify } = useSetup()
-  return (
-    <>
-      <TaskProblemSection a={a} onSaved={setA} notify={notify} />
-      <NextLink to="materials" />
-    </>
-  )
+  return <TaskProblemSection a={a} onSaved={setA} notify={notify} />
 }
 
 export function MaterialsPage() {
   const { a, reload, notify } = useSetup()
-  return (
-    <>
-      <MaterialsSection a={a} onSaved={() => void reload()} notify={notify} />
-      <NextLink to="rules" />
-    </>
-  )
+  return <MaterialsSection a={a} onSaved={reload} notify={notify} />
 }
 
 export function RulesPage() {
   const { a, reload, notify } = useSetup()
-  return (
-    <>
-      <RulesSection a={a} onSaved={() => void reload()} notify={notify} />
-      <NextLink to="tools" />
-    </>
-  )
+  return <RulesSection a={a} onSaved={reload} notify={notify} />
 }
 
+// 도구 연동은 팀원이 맡은 화면이다. 예전 스타일시트가 적용되도록 legacy 영역으로 감싸기만 한다.
 export function ToolsPage() {
   const { a, setA, notify } = useSetup()
   return (
     <>
-      <ToolSection a={a} onSaved={setA} notify={notify} />
-      <NextLink to="publish" />
+      <div className="legacy">
+        <ToolSection a={a} onSaved={setA} notify={notify} />
+      </div>
+      <Foot section="tools" />
     </>
   )
+}
+
+// 서버가 알려 준 공개 조건 문장이 어느 구역의 것인지 가린다. 가리지 못한 문장은 목록 아래에 따로 보여 준다.
+function sectionOfProblem(problem: string): string | null {
+  if (problem.includes('문항이 없는 역량')) return 'tests'
+  if (problem.startsWith('역량')) return 'competencies'
+  if (problem.includes('마감')) return 'task'
+  if (problem.includes('자리 3') || problem.includes('프로그램')) return 'tools'
+  return null
+}
+
+// 구역에 빠진 것이 없을 때 보여 주는 현재 내용
+function detailOf(a: Assignment, key: string): string {
+  switch (key) {
+    case 'competencies':
+      return `역량 ${a.competencies.length}개`
+    case 'tests':
+      return `문항 ${a.items.length}개`
+    case 'task':
+      return a.deadline ? `마감 ${dateTime(a.deadline)}` : ''
+    case 'materials':
+      return a.materials.length ? `자료 ${a.materials.length}개` : '자료 없음'
+    case 'rules':
+      return a.rules.length ? `규칙 ${a.rules.length}개` : '규칙 없음'
+    case 'tools':
+      return TOOL_LABEL[a.tool_name] ?? a.tool_name
+    default:
+      return ''
+  }
 }
 
 export function PublishPage() {
   const { a, setA, notify } = useSetup()
   const [check, setCheck] = useState<{ ok: boolean; problems: string[] } | null>(null)
+  const [asking, setAsking] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(
@@ -100,6 +93,7 @@ export function PublishPage() {
     setBusy(true)
     try {
       setA(await api.prof.publish(a.id))
+      setAsking(false)
       notify('ok', '과제를 공개했다. 학생은 참여 코드로 들어온다.')
     } catch (e) {
       notify('error', e instanceof Error ? e.message : '공개 실패')
@@ -108,80 +102,87 @@ export function PublishPage() {
     }
   }
 
-  return (
-    <div className="card">
-      <h2>7. 점검과 공개</h2>
-      <p className="muted small">
-        공개 조건을 모두 채우면 공개할 수 있다. 공개한 뒤에도 설정을 고칠 수 있지만, 이미 응시한 학생이 있는 단계의 문항은 바꿀 수 없다.
-      </p>
-      <table className="table">
-        <tbody>
-          {SECTIONS.filter((s) => s.key !== 'publish').map((s) => {
-            const done = sectionDone(a, s.key)
-            return (
-              <tr key={s.key}>
-                <td>{s.label}</td>
-                <td>
-                  <span className={`chip ${done === true ? 'chip-ok' : done === false ? 'chip-bad' : ''}`}>
-                    {done === true ? '완료' : done === false ? '미완' : '선택'}
-                  </span>
-                </td>
-                <td>
-                  <Link to={`/prof/assignments/${a.id}/setup/${s.key}`}>열기</Link>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      {check && !check.ok && (
-        <div className="banner" style={{ marginTop: 12 }}>
-          <strong>아직 공개할 수 없다</strong>
-          <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
-            {check.problems.map((p, i) => (
-              <li key={i} className="small">
-                {p}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {check && check.ok && a.status !== 'open' && (
-        <div className="banner info" style={{ marginTop: 12 }}>
-          공개 조건을 모두 채웠다.
-        </div>
-      )}
-      <div className="row" style={{ marginTop: 12 }}>
-        {a.status === 'open' ? (
-          <span className="chip chip-ok">공개 중</span>
-        ) : (
-          <button className="btn" onClick={() => void publish()} disabled={busy || !check?.ok}>
-            공개하기
-          </button>
-        )}
-      </div>
-      {a.status === 'open' && (
-        <div className="share">
-          <div className="muted small">학생에게 알려 줄 참여 코드</div>
-          <div className="share-code">{a.join_code}</div>
-          <div className="muted small">
-            학생은 {window.location.origin}/stu 에서 로그인한 뒤 이 코드를 입력해 참여한다. 자리 {a.tool_slot} 과제이므로 학생은 과제 단계에서{' '}
-            {a.tool_slot === 2 ? 'Google 계정을 연결한다' : a.tool_slot === 3 ? '보조 프로그램을 설치한다' : '페이지 안 도구를 쓴다'}.
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+  const problems = check?.problems ?? []
+  const unplaced = problems.filter((p) => sectionOfProblem(p) === null)
+  const rows = setupNav
+    .filter(([, key]) => key !== 'publish')
+    .map(([label, key, Icon]) => {
+      const missing = problems.filter((p) => sectionOfProblem(p) === key)
+      // 과제 설명은 공개 조건은 아니지만 구역 완료 조건이다.
+      if (key === 'task' && !a.description.trim()) missing.push('과제 설명이 비어 있다')
+      const done = sectionDone(a, key)
+      const tone: Tone = missing.length || done === false ? 'alert' : done === null ? 'todo' : 'done'
+      return {
+        label,
+        key,
+        Icon,
+        tone,
+        state: tone === 'alert' ? '미완료' : tone === 'todo' ? '선택' : '완료',
+        detail: missing.length ? missing.join(', ') : detailOf(a, key),
+      }
+    })
+  const joinUrl = `${window.location.origin}/stu`
 
-function NextLink({ to }: { to: string }) {
-  const { a } = useSetup()
-  const label = SECTIONS.find((s) => s.key === to)?.label ?? to
   return (
-    <div className="row" style={{ justifyContent: 'flex-end' }}>
-      <Link className="btn btn-secondary" to={`/prof/assignments/${a.id}/setup/${to}`}>
-        다음, {label}
-      </Link>
-    </div>
+    <>
+      <div className="rows check-list">
+        {rows.map(({ label, key, Icon, tone, state, detail }) => (
+          <Link className="row" key={key} to={`../${key}`} relative="path">
+            <span className="name">
+              <Icon aria-hidden="true" />
+              {label}
+            </span>
+            <Status tone={tone}>{state}</Status>
+            <span className="end">
+              <span>{detail}</span>
+              <ChevronRight aria-hidden="true" />
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <Section title="공개">
+        {unplaced.length > 0 && <Notice kind="error">{unplaced.join(', ')}</Notice>}
+        {a.status === 'open' ? (
+          <div className="rows">
+            <div className="row">
+              <span className="name">상태</span>
+              <Status tone={STATUS_TONE[a.status]}>{STATUS_LABEL[a.status]}</Status>
+            </div>
+            <div className="row">
+              <span className="name">과제 코드</span>
+              <span className="mono">{a.join_code}</span>
+              <span className="end">
+                <CopyButton text={a.join_code} label="코드 복사" />
+              </span>
+            </div>
+            <div className="row">
+              <span className="name">참여 주소</span>
+              <span className="mono grow">{joinUrl}</span>
+              <span className="end">
+                <CopyButton text={joinUrl} label="주소 복사" />
+              </span>
+            </div>
+          </div>
+        ) : asking ? (
+          <div className="confirm" role="alertdialog" aria-label="공개 확인">
+            <p>공개하면 학생이 과제 코드로 참여할 수 있다. 응시한 학생이 생긴 시험의 문항은 바꿀 수 없다.</p>
+            <button type="button" className="btn" onClick={() => setAsking(false)} disabled={busy}>
+              취소
+            </button>
+            <button type="button" className="btn primary" onClick={() => void publish()} disabled={busy}>
+              공개
+            </button>
+          </div>
+        ) : (
+          <div className="inline">
+            <button type="button" className="btn primary" disabled={!check?.ok} onClick={() => setAsking(true)}>
+              공개
+            </button>
+            <Status tone={STATUS_TONE[a.status]}>{STATUS_LABEL[a.status]}</Status>
+          </div>
+        )}
+      </Section>
+    </>
   )
 }

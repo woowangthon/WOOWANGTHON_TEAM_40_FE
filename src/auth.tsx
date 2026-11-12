@@ -7,6 +7,8 @@ interface AuthValue {
   loading: boolean
   login: (email: string, password: string) => Promise<User>
   signup: (email: string, password: string, name: string, role: Role) => Promise<User>
+  // 소셜 로그인 뒤 서버가 준 일회용 표를 로그인 토큰으로 바꾼다.
+  completeSocial: (ticket: string) => Promise<User>
   logout: () => void
 }
 
@@ -46,12 +48,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.user
   }, [])
 
+  const completeSocial = useCallback(async (ticket: string) => {
+    const res = await api.auth.socialExchange(ticket)
+    setToken(res.token)
+    setUser(res.user)
+    return res.user
+  }, [])
+
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
   }, [])
 
-  const value = useMemo(() => ({ user, loading, login, signup, logout }), [user, loading, login, signup, logout])
+  const value = useMemo(
+    () => ({ user, loading, login, signup, completeSocial, logout }),
+    [user, loading, login, signup, completeSocial, logout],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

@@ -1,8 +1,13 @@
-import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Pause, Play } from 'lucide-react'
 
-import type { Role } from '../api'
+import { api, type Role, type SocialProvider } from '../api'
+import githubDark from '../assets/github-dark.svg'
+import githubLight from '../assets/github.svg'
 import { useAuth } from '../auth'
+import { APP_NAME, homePath } from '../nav'
+import { Notice, ThemeToggle, vars } from '../ui'
 
 function takeExpiredFlag(): boolean {
   try {
@@ -14,28 +19,109 @@ function takeExpiredFlag(): boolean {
   }
 }
 
+// 로그인 전에 열려던 주소. 그 역할이 볼 수 있는 주소일 때만 로그인 뒤에 그곳으로 돌아간다.
+function returnPath(state: unknown, role: Role): string {
+  const from = (state as { from?: { pathname?: string; search?: string } } | null)?.from
+  const path = from?.pathname ?? ''
+  if (path.startsWith(homePath(role))) return path + (from?.search ?? '')
+  return homePath(role)
+}
+
+// 로그인 화면 오른쪽 사진. public/login 의 파일만 바꾸면 사진이 교체된다. 출처는 README 에 적었다.
+const PHOTOS = ['/login/photo-1.webp', '/login/photo-2.webp']
+// 한 장이 머무는 시간. W3C 예제와 Bootstrap 의 기본값 5초를 하한으로 보고 그보다 길게 둔다.
+const HOLD_MS = 8000
+// 겹쳐 넘어가는 시간. Material 3 가 자동으로 넘어가는 배경 전환에 쓰는 가장 긴 값이다.
+const FADE_MS = 1000
+
+function LoginPhotos() {
+  const [i, setI] = useState(0)
+  // 움직임을 줄이도록 설정한 사용자에게는 자동 전환을 하지 않는다.
+  const [paused, setPaused] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
+  // 마우스를 올리거나 키보드 초점이 들어와 있는 동안에도 멈춘다.
+  const [held, setHeld] = useState(false)
+
+  useEffect(() => {
+    if (paused || held) return
+    const t = setTimeout(() => setI((n) => (n + 1) % PHOTOS.length), HOLD_MS)
+    return () => clearTimeout(t)
+  }, [i, paused, held])
+
+  return (
+    <div
+      className="photos"
+      style={vars({ '--fade': `${FADE_MS}ms` })}
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={() => setHeld(false)}
+    >
+      {PHOTOS.map((src, k) => (
+        <img key={src} src={src} alt="" className={k === i ? 'on' : ''} decoding="async" />
+      ))}
+      <div className="photo-ctl">
+        {PHOTOS.map((src, k) => (
+          <button key={src} type="button" aria-label={`사진 ${k + 1} 보기`} aria-pressed={k === i} onClick={() => setI(k)}>
+            <span className={k === i ? 'bar on' : 'bar'} />
+          </button>
+        ))}
+        <button type="button" aria-label={paused ? '사진 전환 다시 시작' : '사진 전환 멈춤'} onClick={() => setPaused((p) => !p)}>
+          {paused ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Google 로그인 버튼에 쓰는 G 마크. Google 이 버튼 코드로 공개한 SVG 경로다.
+// 버튼의 문구와 바탕과 테두리 색은 https://developers.google.com/identity/branding-guidelines 를 따른다.
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  )
+}
+
 export default function LoginPage({ initialMode }: { initialMode?: 'login' | 'signup' }) {
   const { user, login, signup } = useAuth()
   const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const [mode, setMode] = useState<'login' | 'signup'>(initialMode ?? (params.get('mode') === 'signup' ? 'signup' : 'login'))
+  const location = useLocation()
+  const mode = initialMode ?? 'login'
   const [expired] = useState(takeExpiredFlag)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState<Role>('student')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // 서버에 키가 설정된 소셜 로그인만 버튼으로 보여 준다. 설정이 없으면 버튼이 없다.
+  const [providers, setProviders] = useState<SocialProvider[]>([])
 
-  if (user) return <Navigate to="/" replace />
+  useEffect(() => {
+    api.auth
+      .socialProviders()
+      .then((r) => setProviders(r.providers))
+      .catch(() => setProviders([]))
+  }, [])
+
+  if (user) return <Navigate to={returnPath(location.state, user.role)} replace />
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (mode === 'signup' && password !== confirm) {
+      setError('비밀번호와 비밀번호 확인이 다르다')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
       const u = mode === 'login' ? await login(email, password) : await signup(email, password, name, role)
-      navigate(u.role === 'professor' ? '/prof' : '/stu', { replace: true })
+      navigate(returnPath(location.state, u.role), { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : '실패했다')
     } finally {
@@ -43,52 +129,120 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 'si
     }
   }
 
+  async function social(provider: SocialProvider) {
+    setBusy(true)
+    setError(null)
+    try {
+      const { url } = await api.auth.socialStart(provider, mode === 'signup' ? { mode, role } : { mode })
+      window.location.assign(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '소셜 로그인을 시작하지 못했다')
+      setBusy(false)
+    }
+  }
+
   return (
-    <div className="login card">
-      <h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
-      {expired && <div className="banner">로그인이 만료되어 다시 로그인한다. 작업 중이던 내용은 저장된 버전까지 남아 있다.</div>}
-      <p className="muted small">교수와 학생 역할로 나뉜다. 교수는 과제를 만들고 학생은 과제 코드로 참여한다.</p>
-      <form onSubmit={(e) => void submit(e)}>
-        {mode === 'signup' && (
-          <>
-            <div className="field">
-              <label>이름</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div className="field">
-              <label>역할</label>
-              <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                <option value="student">학생</option>
-                <option value="professor">교수</option>
-              </select>
-            </div>
-          </>
-        )}
-        <div className="field">
-          <label>이메일</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+    <div className="login">
+      <div className="login-form">
+        <div className="auth-top">
+          <ThemeToggle />
         </div>
-        <div className="field">
-          <label>비밀번호, 8자 이상</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
-        </div>
-        {error && <p className="error small">{error}</p>}
-        <div className="row">
-          <button className="btn" type="submit" disabled={busy}>
+        <form className="auth-box" key={mode} onSubmit={(e) => void submit(e)}>
+          <span className="brand">{APP_NAME}</span>
+          <h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
+          {expired && <Notice>로그인이 만료되어 다시 로그인한다. 작업 중이던 내용은 저장된 버전까지 남아 있다.</Notice>}
+
+          {mode === 'signup' && (
+            <>
+              <div className="field">
+                <label className="label" htmlFor="name">
+                  이름
+                </label>
+                <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoComplete="name" required />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="role">
+                  역할
+                </label>
+                <select id="role" className="select" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+                  <option value="student">학생</option>
+                  <option value="professor">교수</option>
+                </select>
+              </div>
+            </>
+          )}
+          <div className="field">
+            <label className="label" htmlFor="email">
+              이메일
+            </label>
+            <input id="email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@school.ac.kr" autoComplete="email" required />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="pw">
+              비밀번호 8자 이상
+            </label>
+            <input
+              id="pw"
+              className="input"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
+              maxLength={72}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              required
+            />
+          </div>
+          {mode === 'signup' && (
+            <div className="field">
+              <label className="label" htmlFor="pw2">
+                비밀번호 확인
+              </label>
+              <input id="pw2" className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={8} maxLength={72} autoComplete="new-password" required />
+            </div>
+          )}
+          {error && (
+            <p className="error-text" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="btn primary lg" type="submit" disabled={busy}>
             {mode === 'login' ? '로그인' : '가입하고 시작'}
           </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              setMode(mode === 'login' ? 'signup' : 'login')
-              setError(null)
-            }}
-          >
-            {mode === 'login' ? '계정이 없다면 회원가입' : '이미 계정이 있다면 로그인'}
-          </button>
-        </div>
-      </form>
+          <p>
+            {mode === 'login' ? '계정이 없다면 ' : '이미 계정이 있다면 '}
+            <Link className="link" to={mode === 'login' ? '/signup' : '/login'} state={location.state}>
+              {mode === 'login' ? '회원가입' : '로그인'}
+            </Link>
+          </p>
+
+          {providers.length > 0 && (
+            <>
+              <div className="or">또는</div>
+              {providers.includes('google') && (
+                <button type="button" className="btn lg social google" disabled={busy} onClick={() => void social('google')}>
+                  <GoogleMark />
+                  {mode === 'login' ? 'Google 계정으로 로그인' : 'Google 계정으로 가입'}
+                </button>
+              )}
+              {providers.includes('github') && (
+                <button type="button" className="btn lg social" disabled={busy} onClick={() => void social('github')}>
+                  <img className="only-light" src={githubLight} alt="" />
+                  <img className="only-dark" src={githubDark} alt="" />
+                  {mode === 'login' ? 'GitHub 계정으로 로그인' : 'GitHub 계정으로 가입'}
+                </button>
+              )}
+            </>
+          )}
+
+          <p>
+            <Link className="link" to="/privacy">
+              개인정보와 기록 범위 안내
+            </Link>
+          </p>
+        </form>
+      </div>
+      <LoginPhotos />
     </div>
   )
 }

@@ -1,20 +1,32 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { api } from '../../api'
+import { api, type Assignment } from '../../api'
+import { useProfHome } from '../../shells'
+import { Notice, PageHead } from '../../ui'
+import './setup/setup.css'
 
 // 과제 만들기. 짧은 기본 정보만 받고 설정 첫 구역으로 보낸다.
 export default function NewAssignment() {
   const navigate = useNavigate()
+  const { data, reload } = useProfHome()
   const [title, setTitle] = useState('')
   const [subject, setSubject] = useState('')
-  const [taskKind, setTaskKind] = useState<'performance' | 'essay'>('performance')
-  const [deadline, setDeadline] = useState('')
+  const [taskKind, setTaskKind] = useState<Assignment['task_kind']>('performance')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // 이미 쓴 과목 이름을 입력 후보로 보여 준다.
+  const courses = [...new Set((data?.rows ?? []).map((r) => r.subject).filter(Boolean))]
+
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (!title.trim()) {
+      setError('과제 이름을 입력한다.')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -22,8 +34,9 @@ export default function NewAssignment() {
         title: title.trim(),
         subject: subject.trim(),
         task_kind: taskKind,
-        deadline: deadline ? new Date(deadline).toISOString() : null,
+        deadline: date ? new Date(`${date}T${time || '23:59'}`).toISOString() : null,
       })
+      void reload()
       navigate(`/prof/assignments/${a.id}/setup/competencies`)
     } catch (err) {
       setError(err instanceof Error ? err.message : '만들기 실패')
@@ -33,41 +46,62 @@ export default function NewAssignment() {
   }
 
   return (
-    <div className="card" style={{ maxWidth: 640, margin: '0 auto' }}>
-      <h1>과제 만들기</h1>
-      <p className="muted small">
-        여기서는 기본 정보만 받는다. 역량과 채점 기준, 사전 사후 문항, 과제 문제, 학습 자료, AI 응답 규칙, 도구 연동은 다음 화면에서 구역별로 설정한다.
-      </p>
-      <form onSubmit={(e) => void submit(e)}>
-        <div className="field">
-          <label>과제 제목</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="예: 부서별 평균 급여 조회문 설계" />
+    <div className="page narrow setup">
+      <PageHead title="과제 만들기" crumbs={[['최근 과제', '/prof']]} />
+      {error && <Notice kind="error">{error}</Notice>}
+      <form className="form" onSubmit={(e) => void submit(e)}>
+        <div className="form-row">
+          <label className="label" htmlFor="course">
+            과목
+          </label>
+          <input id="course" className="input" list="course-list" value={subject} onChange={(e) => setSubject(e.target.value)} />
+          <datalist id="course-list">
+            {courses.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </div>
-        <div className="grid-2">
-          <div className="field">
-            <label>과목</label>
-            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="예: 데이터베이스" />
+        <div className="form-row">
+          <label className="label" htmlFor="title">
+            과제 이름
+          </label>
+          <input id="title" className="input" value={title} maxLength={200} required onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="form-row">
+          <label className="label" htmlFor="kind">
+            문제 종류
+          </label>
+          <select id="kind" className="select" value={taskKind} onChange={(e) => setTaskKind(e.target.value as Assignment['task_kind'])}>
+            <option value="performance">수행형, 도구로 결과물을 만든다</option>
+            <option value="essay">논술형, 긴 글을 쓴다</option>
+          </select>
+        </div>
+        <div className="form-row">
+          <span className="label">마감</span>
+          <div className="inline">
+            <input
+              className="input w-date"
+              type="date"
+              value={date}
+              aria-label="마감 날짜"
+              onChange={(e) => {
+                setDate(e.target.value)
+                if (e.target.value && !time) setTime('23:59')
+              }}
+            />
+            <input className="input w-time" type="time" value={time} aria-label="마감 시각" onChange={(e) => setTime(e.target.value)} />
           </div>
-          <div className="field">
-            <label>과제 종류</label>
-            <select value={taskKind} onChange={(e) => setTaskKind(e.target.value as 'performance' | 'essay')}>
-              <option value="performance">수행형, 도구로 결과물을 만든다</option>
-              <option value="essay">논술형, 긴 글을 쓴다</option>
-            </select>
+        </div>
+        <div className="form-row">
+          <span />
+          <div className="inline">
+            <button className="btn primary" type="submit" disabled={busy}>
+              만들고 설정 시작
+            </button>
+            <Link className="btn quiet" to="/prof">
+              취소
+            </Link>
           </div>
-        </div>
-        <div className="field">
-          <label>마감, 나중에 바꿀 수 있다</label>
-          <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-        </div>
-        {error && <p className="error small">{error}</p>}
-        <div className="row">
-          <button className="btn" type="submit" disabled={busy}>
-            만들고 설정으로
-          </button>
-          <Link className="btn btn-ghost" to="/prof">
-            취소
-          </Link>
         </div>
       </form>
     </div>
