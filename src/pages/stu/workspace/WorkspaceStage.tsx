@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, Check, ChevronRight, Circle, GitCommitHorizontal, History, Info, SquareFunction, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronRight, Circle, GitCommitHorizontal, History, Info, PanelLeftClose, PanelLeftOpen, PanelRightOpen, SquareFunction, X } from 'lucide-react'
 import { ApiError, type Enrollment } from '../../../api'
 import { Loading, Notice } from '../../../ui'
 import { AiPanel, type AiContext } from './AiPanel'
@@ -69,6 +69,24 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
   const [history, setHistory] = useState(false)
   const [brief, setBrief] = useState(false)
   const [recordInfo, setRecordInfo] = useState(false)
+  /* 좌우 패널 접기. 이 브라우저에서만 기억한다 */
+  const [closed, setClosed] = useState<{ left: boolean; right: boolean }>(() => {
+    try {
+      return { left: false, right: false, ...JSON.parse(localStorage.getItem('ws_panels') ?? '{}') }
+    } catch {
+      return { left: false, right: false }
+    }
+  })
+  const togglePanel = (side: 'left' | 'right') =>
+    setClosed((c) => {
+      const next = { ...c, [side]: !c[side] }
+      try {
+        localStorage.setItem('ws_panels', JSON.stringify(next))
+      } catch {
+        // 저장이 막힌 환경이면 이번 화면에서만 유지한다
+      }
+      return next
+    })
   const [confirming, setConfirming] = useState(false)
   const [pendingPaste, setPendingPaste] = useState<PendingPaste | null>(null)
   const [submitBusy, setSubmitBusy] = useState(false)
@@ -315,6 +333,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
 
   /* ───── AI ───── */
   const askAi = (label: string, detail: string, prompt?: string) => {
+    if (closed.right) togglePanel('right')
     setAiContext({ label, detail, prompt })
     setSeed((s) => s + 1)
   }
@@ -456,9 +475,28 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
         />
       )}
       {/* 수정 이력을 보는 동안에도 작업 화면을 내리지 않는다. 보고서 편집 세션이 끊기지 않게 하기 위해서다 */}
-      <div className="ws" style={history ? { display: 'none' } : undefined}>
-        <aside className="ws-side">
-          <button className="ws-brief-card" onClick={() => setBrief(true)}>
+      <div className={`ws${closed.left ? ' left-closed' : ''}${closed.right ? ' right-closed' : ''}`} style={history ? { display: 'none' } : undefined}>
+        {closed.left ? (
+          <aside className="ws-side ws-rail" aria-label="파일">
+            <button className="ws-icon-btn" title="파일 패널 열기" aria-label="파일 패널 열기" onClick={() => togglePanel('left')}>
+              <PanelLeftOpen aria-hidden="true" />
+            </button>
+            <span className="ws-rail-sep" />
+            {w.files.map((f) => (
+              <button key={f.path} className={f.path === active ? 'ws-icon-btn active' : 'ws-icon-btn'} title={f.path} aria-label={f.path} onClick={() => open(f.path)}>
+                <FileIcon kind={f.kind} />
+              </button>
+            ))}
+          </aside>
+        ) : (
+          <aside className="ws-side">
+            <div className="ws-side-top">
+              <span>파일</span>
+              <button className="ws-icon-btn" title="파일 패널 접기" aria-label="파일 패널 접기" onClick={() => togglePanel('left')}>
+                <PanelLeftClose aria-hidden="true" />
+              </button>
+            </div>
+            <button className="ws-brief-card" onClick={() => setBrief(true)}>
             <span className="ws-brief-icon">
               <SquareFunction aria-hidden="true" />
             </span>
@@ -496,7 +534,8 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
               </div>
             )}
           </div>
-        </aside>
+          </aside>
+        )}
 
         <section className="ws-main" aria-label="작업 영역">
           <div className="ws-bar">
@@ -616,8 +655,22 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
           {pendingPaste && <PastePopup paste={pendingPaste} onSave={(s, m) => closePaste(s, m)} onSkip={() => closePaste(null)} />}
         </section>
 
-        <AiPanel
-          messages={messages}
+        {closed.right ? (
+          <aside className="ws-ai ws-rail" aria-label="AI 도우미">
+            <button className="ws-icon-btn" title="AI 패널 열기" aria-label="AI 패널 열기" onClick={() => togglePanel('right')}>
+              <PanelRightOpen aria-hidden="true" />
+            </button>
+            <span className="ws-rail-label">AI</span>
+            {pending > 0 && (
+              <button className="ws-rail-badge" title={`검토 대기 수정안 ${pending}개`} onClick={() => togglePanel('right')}>
+                {pending}
+              </button>
+            )}
+          </aside>
+        ) : (
+          <AiPanel
+            onCollapse={() => togglePanel('right')}
+            messages={messages}
           proposals={proposals}
           onShowProposal={(p) => {
             open(p.file_path)
@@ -636,7 +689,8 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
           setError={setChatError}
           disabled={!editable}
           onFocusPanel={onFocusPanel}
-        />
+          />
+        )}
       </div>
 
       {brief && (

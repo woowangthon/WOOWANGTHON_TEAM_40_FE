@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, ArrowUp, Bot, Check, Clock3, Code2, Sparkles, X } from 'lucide-react'
+import { ArrowRight, ArrowUp, Bot, Check, Clock3, Code2, PanelRightClose, Sparkles, X } from 'lucide-react'
 import { Notice } from '../../../ui'
 import { clock, type Proposal, type WsMessage } from './wsApi'
 
@@ -41,6 +41,7 @@ function RichText({ text }: { text: string }) {
 }
 
 export function AiPanel({
+  onCollapse,
   messages,
   proposals,
   onShowProposal,
@@ -55,6 +56,7 @@ export function AiPanel({
   disabled,
   onFocusPanel,
 }: {
+  onCollapse: () => void
   messages: WsMessage[]
   proposals: Record<number, Proposal>
   onShowProposal: (p: Proposal) => void
@@ -103,6 +105,10 @@ export function AiPanel({
         </span>
         <strong>AI Tutor</strong>
         <i className={aiAvailable ? 'ws-online' : 'ws-online off'} title={aiAvailable ? '연결됨' : 'AI 키 없음'} />
+        <span className="ws-grow" />
+        <button className="ws-icon-btn" title="AI 패널 접기" aria-label="AI 패널 접기" onClick={onCollapse}>
+          <PanelRightClose aria-hidden="true" />
+        </button>
       </div>
       <div className="ws-ai-body" ref={body}>
         <div className="ws-chat-divider">

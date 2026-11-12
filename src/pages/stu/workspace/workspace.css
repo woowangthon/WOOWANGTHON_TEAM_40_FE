@@ -22,8 +22,11 @@
 }
 
 .ws {
+  --ws-left: 216px;
+  --ws-right: 296px;
   display: grid;
-  grid-template-columns: 216px minmax(0, 1fr) 296px;
+  grid-template-columns: var(--ws-left) minmax(0, 1fr) var(--ws-right);
+  transition: grid-template-columns 0.2s var(--ease);
   height: calc(100vh - 52px);
   min-height: 520px;
   font-size: 13px;
@@ -1867,6 +1870,88 @@
 
 @media (max-width: 1180px) {
   .ws {
-    grid-template-columns: 196px minmax(0, 1fr) 268px;
+    --ws-left: 196px;
+    --ws-right: 268px;
   }
+}
+
+/* 접은 패널: 얇은 막대만 남긴다 */
+.ws.left-closed {
+  --ws-left: 48px;
+}
+
+.ws.right-closed {
+  --ws-right: 48px;
+}
+
+.ws-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0;
+  overflow-y: auto;
+}
+
+.ws-rail .ws-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.ws-rail .ws-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.ws-rail .ws-icon-btn.active {
+  background: var(--ws-soft-2);
+  color: var(--accent-ink);
+}
+
+.ws-rail-sep {
+  width: 20px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line);
+}
+
+.ws-rail-label {
+  writing-mode: vertical-rl;
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.ws-rail-badge {
+  min-width: 20px;
+  height: 20px;
+  margin-top: 6px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ws-side-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  flex: none;
+}
+
+.ws-side-top + .ws-brief-card {
+  margin-top: 10px;
 }
