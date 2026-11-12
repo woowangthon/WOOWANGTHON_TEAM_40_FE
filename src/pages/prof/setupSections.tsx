@@ -8,6 +8,7 @@ import {
   ITEM_TYPE_LABEL,
   toLocalInput,
   type Assignment,
+  type AssignmentEnv,
   type CompetencyInput,
   type ItemInput,
   type ItemType,
@@ -21,13 +22,6 @@ import { Saved, Section, Status, vars } from '../../ui'
 export type Notify = (kind: 'ok' | 'error', text: string) => void
 
 const ITEM_TYPES: ItemType[] = ['choice', 'short', 'fill', 'essay_short', 'essay_long']
-
-export const TOOL_OPTIONS: Record<number, { value: string; label: string }[]> = {
-  0: [{ value: 'editor', label: '페이지 안 문서 편집기, 논술형 과제' }],
-  1: [{ value: 'sql', label: 'Monaco 편집기와 sql.js, SQL 조회문 과제' }],
-  2: [{ value: 'google_docs', label: 'Google 문서, API로 수정 이력을 받는다' }],
-  3: [{ value: 'companion', label: '설치된 프로그램, 보조 프로그램이 창 캡처와 폴더 감시를 한다' }],
-}
 
 // 역량 기호. 역량은 여섯 개까지 둔다.
 const SYMBOLS = 'ABCDEF'
@@ -987,102 +981,296 @@ export function RulesSection({ a, onSaved, notify }: { a: Assignment; onSaved: (
   )
 }
 
-// ---------- 구역 6. 도구 연동. 팀원이 맡은 화면이라 예전 모양 그대로 두고 부르는 쪽에서 legacy 영역으로 감싼다. ----------
-export function ToolSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
-  const [slot, setSlot] = useState(a.tool_slot)
-  const [tool, setTool] = useState(a.tool_name)
-  const cfg = a.tool_config as Record<string, string>
-  const [schemaSql, setSchemaSql] = useState(cfg.schema_sql ?? '')
-  const [seedSql, setSeedSql] = useState(cfg.seed_sql ?? '')
-  const [program, setProgram] = useState(cfg.program ?? 'Excel')
-  const [extensions, setExtensions] = useState(cfg.extensions ?? '.xlsx,.xlsm')
-  const [windowKeyword, setWindowKeyword] = useState(cfg.window_keyword ?? 'Excel')
+// ---------- 구역 6. 도구 연동. 과제 단계의 작업공간에 줄 시작 파일, 채점 테스트, 실행 환경을 정한다. ----------
+type FileRow = { path: string; content: string; readonly: boolean }
+type CaseRow = { name: string; stdin: string; expected: string }
 
-  function changeSlot(s: number) {
-    setSlot(s)
-    setTool(TOOL_OPTIONS[s][0].value)
-  }
+const ENV_STATE: Record<string, [string, 'done' | 'doing' | 'todo' | 'alert']> = {
+  ready: ['준비됨', 'done'],
+  building: ['만드는 중', 'doing'],
+  failed: ['만들기 실패', 'alert'],
+  none: ['아직 만들지 않음', 'todo'],
+  missing: ['이미지 없음', 'todo'],
+}
+
+const words = (text: string) => text.split(/[\s,]+/).filter(Boolean)
+
+export function ToolSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
+  const cfg = a.tool_config as { files?: Partial<FileRow>[]; tests?: Partial<CaseRow>[] }
+  const [files, setFiles] = useState<FileRow[]>(
+    (cfg.files ?? []).map((f) => ({ path: f.path ?? '', content: f.content ?? '', readonly: Boolean(f.readonly) })),
+  )
+  const [open, setOpen] = useState(0)
+  const [cases, setCases] = useState<CaseRow[]>((cfg.tests ?? []).map((t) => ({ name: t.name ?? '', stdin: t.stdin ?? '', expected: t.expected ?? '' })))
+  const [env, setEnv] = useState<AssignmentEnv | null>(null)
+  const [useEnv, setUseEnv] = useState(false)
+  const [preset, setPreset] = useState('ubuntu-22.04')
+  const [envName, setEnvName] = useState('')
+  const [required, setRequired] = useState(false)
+  const [apt, setApt] = useState('')
+  const [pip, setPip] = useState('')
+  const [cflags, setCflags] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, flash] = useSaved()
+
+  // 서버에 저장된 환경으로 입력 칸을 맞춘다
+  const fill = useCallback((e: AssignmentEnv) => {
+    setEnv(e)
+    setUseEnv(e.spec !== null)
+    if (e.spec) {
+      setPreset(e.spec.preset)
+      setEnvName(e.spec.name)
+      setRequired(e.spec.required)
+      setApt(e.spec.apt.join(' '))
+      setPip(e.spec.pip.join(' '))
+      setCflags(e.spec.cflags)
+    }
+  }, [])
+
+  useEffect(() => {
+    api.prof
+      .envGet(a.id)
+      .then(fill)
+      .catch((e: unknown) => notify('error', messageOf(e, '실행 환경을 불러오지 못했다')))
+  }, [a.id, fill, notify])
+
+  // 이미지를 만드는 동안에는 상태만 다시 읽는다
+  const building = env?.environment?.status === 'building'
+  useEffect(() => {
+    if (!building) return
+    const t = setInterval(() => {
+      api.prof
+        .envGet(a.id)
+        .then(setEnv)
+        .catch(() => {})
+    }, 4000)
+    return () => clearInterval(t)
+  }, [building, a.id])
+
+  const editFile = (i: number, patch: Partial<FileRow>) => setFiles((fs) => fs.map((f, j) => (j === i ? { ...f, ...patch } : f)))
+  const editCase = (i: number, patch: Partial<CaseRow>) => setCases((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)))
+
   async function save() {
-    const tool_config: Record<string, string> =
-      tool === 'sql'
-        ? { schema_sql: schemaSql, seed_sql: seedSql }
-        : tool === 'companion'
-          ? { program, extensions, window_keyword: windowKeyword }
-          : {}
+    const kept = files.filter((f) => f.path.trim())
+    const paths = kept.map((f) => f.path.trim())
+    if (kept.length === 0) return notify('error', '시작 파일이 하나 이상 있어야 한다.')
+    if (new Set(paths).size !== paths.length) return notify('error', '같은 이름의 파일이 있다.')
+    setSaving(true)
     try {
-      onSaved(await api.prof.update(a.id, { tool_slot: slot, tool_name: tool, tool_config }))
+      // 파일과 테스트를 먼저 저장하고 환경은 서버가 검사하는 전용 주소로 보낸다. 환경을 저장하면 서버가 이미지를 만들기 시작한다
+      await api.prof.update(a.id, {
+        tool_slot: 4,
+        tool_name: 'workspace',
+        tool_config: {
+          ...a.tool_config,
+          files: kept.map((f) => ({ path: f.path.trim(), content: f.content, readonly: f.readonly })),
+          tests: cases.filter((c) => c.name.trim() || c.expected.trim()),
+        },
+      })
+      fill(
+        await api.prof.envSet(
+          a.id,
+          useEnv ? { preset, name: envName.trim(), required, apt: words(apt), pip: words(pip), cflags: cflags.trim() } : {},
+        ),
+      )
+      onSaved(await api.prof.get(a.id))
       notify('ok', '도구 연동을 저장했다.')
+      flash()
     } catch (e) {
-      notify('error', e instanceof Error ? e.message : '저장 실패')
+      notify('error', messageOf(e, '저장 실패'))
+    } finally {
+      setSaving(false)
     }
   }
+
+  const shown = files[open]
+  const p = env?.presets[preset]
+  const state = env?.environment ? ENV_STATE[env.environment.status] : null
+
   return (
-    <div className="card" id="sec6">
-      <div className="card-title">
-        <div>
-          <h2>6. 도구 연동</h2>
-          <p className="muted small">
-            도구가 실행되는 자리를 고른다. 자리 1은 페이지 안에 넣는 웹 도구, 자리 2는 API로 연동하는 웹 도구, 자리 3은 학생 컴퓨터에 설치된
-            프로그램이다. 결과물 버전은 자리 1에서는 저장할 때마다, 자리 2에서는 API 수정 이력마다, 자리 3에서는 저장 폴더에 저장될 때마다 생긴다.
-          </p>
+    <>
+      <Section title="시작 파일">
+        <div className="rows">
+          {files.map((f, i) => (
+            <div className="row" key={i}>
+              <button type="button" className="btn icon quiet" aria-label={`${f.path || '새 파일'} 내용 열기`} aria-pressed={open === i} onClick={() => setOpen(i)}>
+                {f.path.endsWith('.docx') ? <FileText aria-hidden="true" /> : <FileCode2 aria-hidden="true" />}
+              </button>
+              <input
+                className="input grow mono"
+                value={f.path}
+                placeholder="main.py"
+                aria-label="파일 이름"
+                onFocus={() => setOpen(i)}
+                onChange={(e) => editFile(i, { path: e.target.value })}
+              />
+              <div className="seg" role="group" aria-label="학생 수정 여부">
+                <button type="button" aria-pressed={!f.readonly} onClick={() => editFile(i, { readonly: false })}>
+                  학생이 수정
+                </button>
+                <button type="button" aria-pressed={f.readonly} onClick={() => editFile(i, { readonly: true })}>
+                  읽기 전용
+                </button>
+              </div>
+              <button
+                type="button"
+                className="btn icon quiet"
+                aria-label="파일 삭제"
+                onClick={() => {
+                  setFiles((fs) => fs.filter((_, j) => j !== i))
+                  setOpen(0)
+                }}
+              >
+                <Trash2 aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          {files.length === 0 && <div className="empty">아직 파일이 없다</div>}
         </div>
-        <button className="btn btn-sm" onClick={() => void save()}>
-          저장
+        <button
+          type="button"
+          className="btn after-rows"
+          onClick={() => {
+            setFiles((fs) => [...fs, { path: '', content: '', readonly: false }])
+            setOpen(files.length)
+          }}
+        >
+          <Plus aria-hidden="true" />
+          파일 추가
         </button>
-      </div>
-      <div className="row">
-        <div className="field">
-          <label>자리</label>
-          <select value={slot} onChange={(e) => changeSlot(Number(e.target.value))}>
-            <option value={0}>자리 0, 페이지 안 문서 편집기</option>
-            <option value={1}>자리 1, 페이지 안 웹 도구</option>
-            <option value={2}>자리 2, API 연동 웹 도구</option>
-            <option value={3}>자리 3, 설치된 프로그램</option>
-          </select>
+        {shown && (
+          <div className="form setup-gap">
+            <div className="form-row">
+              <label className="label" htmlFor="tool-file">
+                {shown.path || '새 파일'}
+              </label>
+              <textarea
+                id="tool-file"
+                className="textarea mono"
+                rows={12}
+                spellCheck={false}
+                value={shown.content}
+                placeholder={shown.path.endsWith('.docx') ? '보고서의 목차를 한 줄에 하나씩 적는다' : '학생이 처음 받는 내용'}
+                onChange={(e) => editFile(open, { content: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+      </Section>
+
+      <Section title="채점 테스트">
+        <div className="rows">
+          {cases.map((c, i) => (
+            <div className="row" key={i}>
+              <input className="input" value={c.name} placeholder="테스트 이름" aria-label="테스트 이름" onChange={(e) => editCase(i, { name: e.target.value })} />
+              <input className="input grow mono" value={c.stdin} placeholder="입력" aria-label="입력" onChange={(e) => editCase(i, { stdin: e.target.value })} />
+              <input
+                className="input grow mono"
+                value={c.expected}
+                placeholder="기대 출력"
+                aria-label="기대 출력"
+                onChange={(e) => editCase(i, { expected: e.target.value })}
+              />
+              <button type="button" className="btn icon quiet" aria-label="테스트 삭제" onClick={() => setCases((cs) => cs.filter((_, j) => j !== i))}>
+                <Trash2 aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          {cases.length === 0 && <div className="empty">Python 과제는 test_ 로 시작하는 파일의 함수로 채점한다</div>}
         </div>
-        <div className="field" style={{ flex: 1 }}>
-          <label>도구</label>
-          <select value={tool} onChange={(e) => setTool(e.target.value)}>
-            {TOOL_OPTIONS[slot].map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+        <button type="button" className="btn after-rows" onClick={() => setCases((cs) => [...cs, { name: '', stdin: '', expected: '' }])}>
+          <Plus aria-hidden="true" />
+          테스트 추가
+        </button>
+      </Section>
+
+      <Section title="실행 환경">
+        <div className="form">
+          <div className="form-row">
+            <span className="label">환경</span>
+            <div className="seg" role="group" aria-label="실행 환경 종류">
+              <button type="button" aria-pressed={!useEnv} onClick={() => setUseEnv(false)}>
+                서비스 기본 환경
+              </button>
+              <button type="button" aria-pressed={useEnv} onClick={() => setUseEnv(true)}>
+                운영체제 지정
+              </button>
+            </div>
+          </div>
+          {useEnv && (
+            <>
+              <div className="form-row">
+                <label className="label" htmlFor="env-os">
+                  운영체제
+                </label>
+                <select id="env-os" className="select" value={preset} onChange={(e) => setPreset(e.target.value)}>
+                  {Object.entries(env?.presets ?? {}).map(([key, v]) => (
+                    <option key={key} value={key}>
+                      {v.os}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {p && (
+                <div className="form-row">
+                  <span className="label">기본 도구</span>
+                  <div className="plain">{[p.python, p.cpp, p.java].join(', ')}</div>
+                </div>
+              )}
+              <div className="form-row">
+                <label className="label" htmlFor="env-name">
+                  환경 이름
+                </label>
+                <input id="env-name" className="input" value={envName} placeholder="운영체제 과제 채점 환경" onChange={(e) => setEnvName(e.target.value)} />
+              </div>
+              <div className="form-row">
+                <label className="label" htmlFor="env-apt">
+                  apt 패키지
+                </label>
+                <input id="env-apt" className="input mono" value={apt} placeholder="valgrind gdb" onChange={(e) => setApt(e.target.value)} />
+              </div>
+              <div className="form-row">
+                <label className="label" htmlFor="env-pip">
+                  pip 패키지
+                </label>
+                <input id="env-pip" className="input mono" value={pip} placeholder="numpy pandas" onChange={(e) => setPip(e.target.value)} />
+              </div>
+              <div className="form-row">
+                <label className="label" htmlFor="env-flags">
+                  C++ 컴파일 옵션
+                </label>
+                <input id="env-flags" className="input mono" value={cflags} placeholder="-std=c++17 -O2 -Wall" onChange={(e) => setCflags(e.target.value)} />
+              </div>
+              <div className="form-row">
+                <span className="label">학생 선택</span>
+                <div className="seg" role="group" aria-label="학생이 환경을 고를 수 있는지">
+                  <button type="button" aria-pressed={!required} onClick={() => setRequired(false)}>
+                    기본 환경도 허용
+                  </button>
+                  <button type="button" aria-pressed={required} onClick={() => setRequired(true)}>
+                    이 환경만 사용
+                  </button>
+                </div>
+              </div>
+              {state && (
+                <div className="form-row">
+                  <span className="label">이미지</span>
+                  <div className="plain">
+                    <Status tone={state[1]}>{state[0]}</Status>
+                  </div>
+                </div>
+              )}
+              {env?.environment?.status === 'failed' && env.environment.log && (
+                <div className="form-row">
+                  <span className="label">만들기 기록</span>
+                  <textarea className="textarea mono" rows={6} readOnly value={env.environment.log} aria-label="이미지 만들기 기록" />
+                </div>
+              )}
+            </>
+          )}
         </div>
-      </div>
-      {tool === 'sql' && (
-        <div className="grid-2">
-          <div className="field">
-            <label>스키마 SQL, 학생 편집기의 데이터베이스를 만드는 CREATE TABLE 문</label>
-            <textarea value={schemaSql} onChange={(e) => setSchemaSql(e.target.value)} style={{ minHeight: 160, fontFamily: 'monospace' }} />
-          </div>
-          <div className="field">
-            <label>초기 데이터 SQL, INSERT 문</label>
-            <textarea value={seedSql} onChange={(e) => setSeedSql(e.target.value)} style={{ minHeight: 160, fontFamily: 'monospace' }} />
-          </div>
-        </div>
-      )}
-      {tool === 'companion' && (
-        <div className="row">
-          <div className="field">
-            <label>프로그램 이름</label>
-            <input value={program} onChange={(e) => setProgram(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>감시할 파일 확장자, 쉼표로 구분</label>
-            <input value={extensions} onChange={(e) => setExtensions(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>캡처할 창 제목에 들어가는 말</label>
-            <input value={windowKeyword} onChange={(e) => setWindowKeyword(e.target.value)} />
-          </div>
-        </div>
-      )}
-      {tool === 'google_docs' && (
-        <p className="muted small">학생이 과제 단계에서 Google 계정을 연결하고 문서를 지정하면 서버가 수정 이력을 받아 버전을 만든다.</p>
-      )}
-      {tool === 'editor' && <p className="muted small">학생은 페이지 안 편집기에 글을 쓰고 저장할 때마다 버전이 남는다.</p>}
-    </div>
+      </Section>
+      <Foot section="tools" onSave={() => void save()} saved={saved} busy={saving} />
+    </>
   )
 }

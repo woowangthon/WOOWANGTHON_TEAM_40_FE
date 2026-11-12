@@ -558,6 +558,9 @@ export const api = {
     setRules: (id: number, body: { target: RuleTarget; text: string }[]) =>
       request<Rule[]>('PUT', `/api/assignments/${id}/rules`, { body }),
     publish: (id: number) => request<Assignment>('POST', `/api/assignments/${id}/publish`),
+    envGet: (id: number) => request<AssignmentEnv>('GET', `/api/assignments/${id}/environment`),
+    envSet: (id: number, body: EnvSpec | Record<string, never>) =>
+      request<AssignmentEnv>('PUT', `/api/assignments/${id}/environment`, { body }),
     publishCheck: (id: number) =>
       request<{ ok: boolean; problems: string[]; status: string; join_code: string }>('GET', `/api/assignments/${id}/publish-check`),
     overview: (id: number) => request<Overview>('GET', `/api/assignments/${id}/overview`),
@@ -647,6 +650,15 @@ export const MODE_LABEL: Record<string, string> = {
   direct: '직접 답',
   interrogative: '되묻기',
   refuse: '거절',
+}
+
+// 교수가 과제마다 정하는 실행 환경. 서버가 이 설정으로 이미지를 만든다
+export type EnvSpec = { preset: string; name: string; required: boolean; apt: string[]; pip: string[]; cflags: string }
+export type AssignmentEnv = {
+  presets: Record<string, { os: string; python: string; cpp: string; java: string }>
+  spec: EnvSpec | null
+  environment: { status: 'ready' | 'building' | 'failed' | 'none' | 'missing'; log?: string } | null
+  dockerfile: string
 }
 
 export const TOOL_LABEL: Record<string, string> = {

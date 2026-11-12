@@ -5,7 +5,7 @@ import { ChevronRight } from 'lucide-react'
 import { api, TOOL_LABEL, type Assignment } from '../../../api'
 import { sectionDone, setupNav, STATUS_LABEL, STATUS_TONE } from '../../../nav'
 import { CopyButton, dateTime, Notice, Section, Status, type Tone } from '../../../ui'
-import { CompetenciesSection, Foot, MaterialsSection, RulesSection, TaskProblemSection, TestsSection, ToolSection } from '../setupSections'
+import { CompetenciesSection, MaterialsSection, RulesSection, TaskProblemSection, TestsSection, ToolSection } from '../setupSections'
 import { useSetup } from './SetupLayout'
 
 export function CompetenciesPage() {
@@ -33,17 +33,9 @@ export function RulesPage() {
   return <RulesSection a={a} onSaved={reload} notify={notify} />
 }
 
-// 도구 연동은 팀원이 맡은 화면이다. 예전 스타일시트가 적용되도록 legacy 영역으로 감싸기만 한다.
 export function ToolsPage() {
   const { a, setA, notify } = useSetup()
-  return (
-    <>
-      <div className="legacy">
-        <ToolSection a={a} onSaved={setA} notify={notify} />
-      </div>
-      <Foot section="tools" />
-    </>
-  )
+  return <ToolSection a={a} onSaved={setA} notify={notify} />
 }
 
 // 서버가 알려 준 공개 조건 문장이 어느 구역의 것인지 가린다. 가리지 못한 문장은 목록 아래에 따로 보여 준다.
@@ -51,9 +43,11 @@ function sectionOfProblem(problem: string): string | null {
   if (problem.includes('문항이 없는 역량')) return 'tests'
   if (problem.startsWith('역량')) return 'competencies'
   if (problem.includes('마감')) return 'task'
-  if (problem.includes('자리 3') || problem.includes('프로그램')) return 'tools'
+  if (problem.includes('작업공간') || problem.includes('프로그램')) return 'tools'
   return null
 }
+
+const toolFiles = (a: Assignment) => ((a.tool_config as { files?: unknown[] }).files ?? []).length
 
 // 구역에 빠진 것이 없을 때 보여 주는 현재 내용
 function detailOf(a: Assignment, key: string): string {
@@ -69,7 +63,7 @@ function detailOf(a: Assignment, key: string): string {
     case 'rules':
       return a.rules.length ? `규칙 ${a.rules.length}개` : '규칙 없음'
     case 'tools':
-      return TOOL_LABEL[a.tool_name] ?? a.tool_name
+      return a.tool_name === 'workspace' ? `시작 파일 ${toolFiles(a)}개` : (TOOL_LABEL[a.tool_name] ?? a.tool_name)
     default:
       return ''
   }

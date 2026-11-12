@@ -34,6 +34,10 @@ export default function NewAssignment() {
         title: title.trim(),
         subject: subject.trim(),
         task_kind: taskKind,
+        // 과제 단계는 작업공간 하나로 한다. 시작 파일은 도구 연동에서 바꾼다
+        tool_slot: 4,
+        tool_name: 'workspace',
+        tool_config: { files: [{ path: 'main.py', content: '', readonly: false }] },
         deadline: date ? new Date(`${date}T${time || '23:59'}`).toISOString() : null,
       })
       void reload()

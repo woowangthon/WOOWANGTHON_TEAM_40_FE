@@ -81,7 +81,7 @@ export function sectionDone(a: Assignment, key: string): boolean | null {
     case 'rules':
       return a.rules.length > 0 ? true : null
     case 'tools':
-      return true
+      return a.tool_name === 'workspace' && ((a.tool_config as { files?: unknown[] }).files ?? []).length > 0
     case 'publish':
       return a.status === 'open'
     default:
