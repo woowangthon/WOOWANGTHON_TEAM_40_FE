@@ -1955,3 +1955,342 @@
 .ws-side-top + .ws-brief-card {
   margin-top: 10px;
 }
+
+/* ───── 실행 환경 선택 (프로토타입) ───── */
+.ws-env {
+  --ws-panel: color-mix(in srgb, var(--bg-side) 45%, var(--bg));
+  --ws-soft: color-mix(in srgb, var(--accent) 8%, var(--bg));
+  --ws-soft-2: color-mix(in srgb, var(--accent) 14%, var(--bg));
+  --ws-soft-line: color-mix(in srgb, var(--accent) 28%, var(--line));
+  --ws-ok: #1f9d67;
+  --ws-shadow: 0 1px 2px rgb(16 20 30 / 0.04), 0 6px 18px rgb(16 20 30 / 0.06);
+  min-height: calc(100vh - 52px);
+  padding: 48px 24px 64px;
+  background: var(--ws-panel);
+  font-size: 13.5px;
+}
+
+:root[data-theme='dark'] .ws-env {
+  --ws-ok: #48c08c;
+  --ws-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+.ws-env svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.ws-env-col {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.ws-env-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ws-soft-2);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ws-env-eyebrow svg {
+  width: 13px;
+  height: 13px;
+}
+
+.ws-env h1 {
+  margin: 14px 0 6px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ws-env-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.ws-env-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.ws-env-card:hover:not(:disabled) {
+  border-color: var(--ws-soft-line);
+  box-shadow: var(--ws-shadow);
+  transform: translateY(-1px);
+}
+
+.ws-env-card.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), var(--ws-shadow);
+}
+
+.ws-env-card.locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ws-env-card:disabled:not(.locked) {
+  cursor: default;
+}
+
+.ws-env-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ws-env-card-head strong,
+.ws-env-card-head small {
+  display: block;
+}
+
+.ws-env-card-head strong {
+  font-size: 15px;
+}
+
+.ws-env-card-head small {
+  margin-top: 1px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.ws-env-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--ws-soft-2);
+  color: var(--accent-ink);
+}
+
+.ws-env-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.ws-env-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ws-soft-2);
+  color: var(--accent-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.ws-env-badge.req {
+  background: color-mix(in srgb, var(--alert) 12%, var(--bg));
+  color: var(--alert);
+}
+
+.ws-env-radio {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 1.5px solid var(--line-2);
+  border-radius: 50%;
+}
+
+.ws-env-card.on .ws-env-radio {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.ws-env-radio svg {
+  width: 13px;
+  height: 13px;
+}
+
+.ws-env-spec {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px 12px;
+  margin: 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--ws-panel);
+}
+
+.ws-env-spec dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.ws-env-spec dt svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ws-env-spec dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ws-env-spec code,
+.ws-env-pkgs code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--bg-hover);
+  font: 12px var(--mono);
+}
+
+.ws-env-pkgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ws-env-note {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.ws-env-lock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--alert);
+  font-size: 12.5px;
+}
+
+.ws-env-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 16px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.ws-env-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.ws-btn.lg {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ws-env-prep {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  box-shadow: var(--ws-shadow);
+  animation: rise 0.2s var(--ease) both;
+}
+
+.ws-env-prep ol {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-env-prep li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-3);
+}
+
+.ws-env-prep li > span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--line-2);
+  border-radius: 50%;
+}
+
+.ws-env-prep li.now {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ws-env-prep li.now > span {
+  border-color: transparent;
+}
+
+.ws-env-prep li.done {
+  color: var(--text-2);
+}
+
+.ws-env-prep li.done > span {
+  border-color: var(--ws-ok);
+  background: var(--ws-ok);
+  color: #fff;
+}
+
+.ws-env-prep li svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ws-env-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ws-soft-line);
+  border-radius: 999px;
+  background: var(--ws-soft);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ws-env-chip:hover {
+  background: var(--ws-soft-2);
+}
+
+.ws-env-chip svg {
+  width: 13px;
+  height: 13px;
+}
+
+@media (max-width: 760px) {
+  .ws-env-cards {
+    grid-template-columns: 1fr;
+  }
+}

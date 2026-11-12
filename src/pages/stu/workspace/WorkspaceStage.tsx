@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, Check, ChevronRight, Circle, GitCommitHorizontal, History, Info, PanelLeftClose, PanelLeftOpen, PanelRightOpen, SquareFunction, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronRight, Circle, GitCommitHorizontal, History, Info, Monitor, PanelLeftClose, PanelLeftOpen, PanelRightOpen, SquareFunction, X } from 'lucide-react'
 import { ApiError, type Enrollment } from '../../../api'
 import { Loading, Notice } from '../../../ui'
 import { AiPanel, type AiContext } from './AiPanel'
 import { CodeEditor, type PasteInfo } from './CodeEditor'
 import { BriefDialog, CompleteDialog, PastePopup, type PendingPaste } from './dialogs'
 import { DocEditor } from './DocEditor'
+import { DEFAULT_ENV, EnvDialog, EnvSelect, envLabel, professorEnv, type EnvChoice } from './EnvSelect'
 import { FileIcon, FileTree } from './FileTree'
 import { HistoryView } from './HistoryView'
 import { OutputPanel, type RunView } from './OutputPanel'
@@ -77,6 +78,31 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
       return { left: false, right: false }
     }
   })
+  /* 실행 환경 선택 (프로토타입). 고른 값은 이 브라우저에 두고 선택 사실은 이벤트로 남긴다 */
+  const prof = professorEnv(enrollment.assignment.tool_config ?? {})
+  const envKey = `ws_env_${eid}`
+  const [envChoice, setEnvChoice] = useState<EnvChoice | null>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(envKey) ?? 'null') as EnvChoice | null
+    } catch {
+      return null
+    }
+  })
+  const [envPicking, setEnvPicking] = useState(false)
+  const [envOpen, setEnvOpen] = useState(false)
+  const effectiveEnv = prof.required || envChoice?.key !== 'default' ? prof : DEFAULT_ENV
+  const pickEnv = (key: EnvChoice['key']) => {
+    const choice = { key, at: new Date().toISOString() }
+    setEnvChoice(choice)
+    setEnvPicking(false)
+    try {
+      localStorage.setItem(envKey, JSON.stringify(choice))
+    } catch {
+      // 저장이 막힌 환경이면 이번 화면에서만 유지한다
+    }
+    ws.events(eid, [{ kind: 'env_select', payload: { env: key, os: key === 'professor' ? prof.os : DEFAULT_ENV.os, required: prof.required } }]).catch(() => undefined)
+  }
+
   const togglePanel = (side: 'left' | 'right') =>
     setClosed((c) => {
       const next = { ...c, [side]: !c[side] }
@@ -467,6 +493,9 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
 
   return (
     <>
+      {w.editable && (!envChoice || envPicking) && !history && (
+        <EnvSelect title={w.title} prof={prof} current={envChoice} onPick={pickEnv} onCancel={envChoice ? () => setEnvPicking(false) : undefined} />
+      )}
       {history && (
         <HistoryView
           commits={commits}
@@ -475,7 +504,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
         />
       )}
       {/* 수정 이력을 보는 동안에도 작업 화면을 내리지 않는다. 보고서 편집 세션이 끊기지 않게 하기 위해서다 */}
-      <div className={`ws${closed.left ? ' left-closed' : ''}${closed.right ? ' right-closed' : ''}`} style={history ? { display: 'none' } : undefined}>
+      <div className={`ws${closed.left ? ' left-closed' : ''}${closed.right ? ' right-closed' : ''}`} style={history || (w.editable && (!envChoice || envPicking)) ? { display: 'none' } : undefined}>
         {closed.left ? (
           <aside className="ws-side ws-rail" aria-label="파일">
             <button className="ws-icon-btn" title="파일 패널 열기" aria-label="파일 패널 열기" onClick={() => togglePanel('left')}>
@@ -564,6 +593,9 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
                 )
               })}
             </div>
+            <button className="ws-env-chip" onClick={() => setEnvOpen(true)} title="실행 환경 보기">
+              <Monitor aria-hidden="true" /> {envLabel(effectiveEnv)}
+            </button>
             <span className="ws-meta num">
               {saving > 0 ? (
                 <>
@@ -693,6 +725,17 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
         )}
       </div>
 
+      {envOpen && (
+        <EnvDialog
+          env={effectiveEnv}
+          required={prof.required || !w.editable}
+          onClose={() => setEnvOpen(false)}
+          onChange={() => {
+            setEnvOpen(false)
+            setEnvPicking(true)
+          }}
+        />
+      )}
       {brief && (
         <BriefDialog
           subject={w.subject}
