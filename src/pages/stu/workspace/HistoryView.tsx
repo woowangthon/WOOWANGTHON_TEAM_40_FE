@@ -55,7 +55,6 @@ export function HistoryView({ commits, onClose, onOpenChat }: { commits: WsCommi
         </button>
         <div className="ws-history-title">
           <strong>수정 이력</strong>
-          <span className="soft ws-small">모든 변경이 자동으로 기록된다</span>
         </div>
         <span className="ws-grow" />
         <div className="seg" role="group" aria-label="변경 종류">

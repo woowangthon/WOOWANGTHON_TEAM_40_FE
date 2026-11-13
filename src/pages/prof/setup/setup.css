@@ -1,147 +1,145 @@
 /* 과제 만들기와 과제 설정 화면에서만 쓰는 규칙. 색은 design.css 의 변수만 쓴다.
    다른 화면에 닿지 않도록 모든 규칙을 setup 영역 안으로 한정한다. */
-@scope (:root) to (.legacy) {
-  /* 저장 결과와 오류는 긴 화면을 내려가 있어도 보이도록 위쪽에 붙여 둔다. */
+/* 저장 결과와 오류는 긴 화면을 내려가 있어도 보이도록 위쪽에 붙여 둔다. */
+.setup .setup-notice {
+  position: sticky;
+  top: 12px;
+  z-index: 4;
+}
+
+.setup .setup-foot {
+  margin-top: 32px;
+}
+
+.setup .setup-gap {
+  margin-bottom: 16px;
+}
+
+.setup .after-rows,
+.setup .rows + .drop {
+  margin-top: 12px;
+}
+
+.setup .w-date {
+  width: 170px;
+}
+
+.setup .w-time {
+  width: 130px;
+}
+
+/* 역량 표 */
+.setup .actions .hint {
+  width: 220px;
+}
+
+.setup .comp-table .col-key {
+  width: 56px;
+}
+
+.setup .comp-table .col-name {
+  width: 170px;
+}
+
+.setup .comp-table .col-desc {
+  width: 220px;
+}
+
+.setup .comp-table .col-del {
+  width: 44px;
+}
+
+.setup .comp-table .textarea {
+  display: block;
+}
+
+.setup .slot-btn b {
+  overflow-wrap: anywhere;
+}
+
+/* 보기. 가려 둔 라디오 버튼에 키보드 초점이 오면 보기 줄에 표시한다. */
+.setup .opt:has(input[type='radio']:focus-visible) {
+  outline: 2px solid var(--accent-bar);
+  outline-offset: 2px;
+}
+
+/* 목록 줄 */
+.setup .row .seg {
+  flex: none;
+}
+
+.setup .row .grow {
+  overflow-wrap: anywhere;
+}
+
+.setup .row .ext {
+  width: 44px;
+  flex: none;
+}
+
+/* 파일 올리기 칸 */
+.setup label.drop {
+  position: relative;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.setup label.drop:hover,
+.setup label.drop.over {
+  background: var(--bg-hover);
+  border-color: var(--accent-bar);
+  color: var(--text);
+}
+
+.setup label.drop.busy {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.setup label.drop input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.setup label.drop:has(input:focus-visible) {
+  outline: 2px solid var(--accent-bar);
+  outline-offset: 2px;
+}
+
+/* 점검 목록. 빠진 내용이 길어도 줄 안에서 접힌다. */
+.setup .check-list .row .end {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.setup .check-list .row .end span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 961px) {
+  /* 역량 칸은 역량 수만큼 나눈다. */
+  .setup .slots.fit {
+    grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr));
+  }
+
+  .setup .check-list .row .name {
+    width: 170px;
+  }
+}
+
+@media (max-width: 960px) {
   .setup .setup-notice {
-    position: sticky;
-    top: 12px;
-    z-index: 4;
+    top: 60px;
   }
 
-  .setup .setup-foot {
-    margin-top: 32px;
-  }
-
-  .setup .setup-gap {
-    margin-bottom: 16px;
-  }
-
-  .setup .after-rows,
-  .setup .rows + .drop {
-    margin-top: 12px;
-  }
-
-  .setup .w-date {
-    width: 170px;
-  }
-
-  .setup .w-time {
-    width: 130px;
-  }
-
-  /* 역량 표 */
-  .setup .actions .hint {
-    width: 220px;
-  }
-
-  .setup .comp-table .col-key {
-    width: 56px;
-  }
-
-  .setup .comp-table .col-name {
-    width: 170px;
-  }
-
-  .setup .comp-table .col-desc {
-    width: 220px;
-  }
-
-  .setup .comp-table .col-del {
-    width: 44px;
-  }
-
-  .setup .comp-table .textarea {
-    display: block;
-  }
-
-  .setup .slot-btn b {
-    overflow-wrap: anywhere;
-  }
-
-  /* 보기. 가려 둔 라디오 버튼에 키보드 초점이 오면 보기 줄에 표시한다. */
-  .setup .opt:has(input[type='radio']:focus-visible) {
-    outline: 2px solid var(--accent-bar);
-    outline-offset: 2px;
-  }
-
-  /* 목록 줄 */
-  .setup .row .seg {
-    flex: none;
-  }
-
-  .setup .row .grow {
-    overflow-wrap: anywhere;
-  }
-
-  .setup .row .ext {
-    width: 44px;
-    flex: none;
-  }
-
-  /* 파일 올리기 칸 */
-  .setup label.drop {
-    position: relative;
-    cursor: pointer;
-    transition: background 0.12s, border-color 0.12s, color 0.12s;
-  }
-
-  .setup label.drop:hover,
-  .setup label.drop.over {
-    background: var(--bg-hover);
-    border-color: var(--accent-bar);
-    color: var(--text);
-  }
-
-  .setup label.drop.busy {
-    opacity: 0.45;
-    cursor: default;
-  }
-
-  .setup label.drop input[type='file'] {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .setup label.drop:has(input:focus-visible) {
-    outline: 2px solid var(--accent-bar);
-    outline-offset: 2px;
-  }
-
-  /* 점검 목록. 빠진 내용이 길어도 줄 안에서 접힌다. */
-  .setup .check-list .row .end {
-    flex: 1;
-    min-width: 0;
-    justify-content: flex-end;
-    text-align: right;
-  }
-
-  .setup .check-list .row .end span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  @media (min-width: 961px) {
-    /* 역량 칸은 역량 수만큼 나눈다. */
-    .setup .slots.fit {
-      grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr));
-    }
-
-    .setup .check-list .row .name {
-      width: 170px;
-    }
-  }
-
-  @media (max-width: 960px) {
-    .setup .setup-notice {
-      top: 60px;
-    }
-
-    .setup .section-head:has(.hint),
-    .setup .section-head:has(.hint) .actions {
-      flex-wrap: wrap;
-    }
+  .setup .section-head:has(.hint),
+  .setup .section-head:has(.hint) .actions {
+    flex-wrap: wrap;
   }
 }

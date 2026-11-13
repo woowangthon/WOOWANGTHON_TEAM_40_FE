@@ -1,14 +1,9 @@
 // 실행환경 설정. 기본 환경과 교수가 지정한 환경 중에서 고른다.
 // 교수 환경은 과제마다 Docker 이미지로 만들어 두고(처음 한 번 몇 분), 고른 환경에서 실행과 테스트가 돈다.
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, Check, Cpu, GraduationCap, Info, Lock, Monitor, Package, RotateCcw, Settings2, TriangleAlert } from 'lucide-react'
+import { ArrowRight, Check, Cpu, GraduationCap, Lock, Monitor, Package, RotateCcw, Settings2, TriangleAlert } from 'lucide-react'
 import { Modal } from './dialogs'
 import { errorText, ws, type EnvInfo, type EnvView } from './wsApi'
-
-const NOTE: Record<EnvView['key'], string> = {
-  professor: '교수가 지정한 채점 환경',
-  default: '서비스 기본 환경',
-}
 
 export function envLabel(e: EnvView): string {
   return `${e.os.split(' (')[0]} · ${e.key === 'professor' ? '교수 환경' : '기본 환경'}`
@@ -136,16 +131,12 @@ export function EnvSelect({ eid, info, onDone, onCancel }: { eid: number; info: 
                   <span className="ws-env-icon">{env.key === 'professor' ? <GraduationCap aria-hidden="true" /> : <Monitor aria-hidden="true" />}</span>
                   <div className="ws-grow">
                     <strong>{env.key === 'professor' ? '교수 지정 환경' : '기본 환경'}</strong>
-                    <small>{env.key === 'professor' ? env.name : '서비스 표준'}</small>
+                    {env.key === 'professor' && <small>{env.name}</small>}
                   </div>
-                  {env.key === 'professor' && prof && <span className={prof.required ? 'ws-env-badge req' : 'ws-env-badge'}>{prof.required ? '필수' : '권장'}</span>}
+                  {env.key === 'professor' && prof?.required && <span className="ws-env-badge req">필수</span>}
                   <span className="ws-env-radio">{on && <Check aria-hidden="true" />}</span>
                 </div>
                 <Spec env={env} />
-                <p className="ws-env-note">
-                  {NOTE[env.key]}
-                  {env.key === 'professor' && env.status !== 'ready' && <span className="soft"> · 처음 고르면 환경을 만드는 데 몇 분 걸려요</span>}
-                </p>
                 {locked && (
                   <p className="ws-env-lock">
                     <Lock aria-hidden="true" /> 교수가 지정 환경을 필수로 정해 고를 수 없다
@@ -155,12 +146,6 @@ export function EnvSelect({ eid, info, onDone, onCancel }: { eid: number; info: 
             )
           })}
         </div>
-
-        {prof && !prof.required && (
-          <p className="ws-env-hint">
-            <Info aria-hidden="true" /> 기본 환경을 골라도 제출할 때는 교수 환경에서 테스트를 한 번 더 돌립니다.
-          </p>
-        )}
 
         {error && (
           <p className="ws-env-error">
@@ -201,7 +186,6 @@ export function EnvSelect({ eid, info, onDone, onCancel }: { eid: number; info: 
                 </div>
                 <p className="soft num">{prog ? `${prog.step}/${prog.total} 단계 · ${prog.text}` : '빌드를 시작하는 중'}</p>
                 <pre className="ws-env-log">{(p?.log ?? '').split('\n').filter(Boolean).slice(-4).join('\n') || '…'}</pre>
-                <p className="soft ws-small">처음 한 번만 만들고, 같은 과제의 다른 학생과 다음 접속부터는 바로 열려요.</p>
               </>
             )}
           </div>
@@ -219,11 +203,10 @@ export function EnvDialog({ env, canChange, onChange, onClose }: { env: EnvView;
         <span className="ws-env-icon">{env.key === 'professor' ? <GraduationCap aria-hidden="true" /> : <Monitor aria-hidden="true" />}</span>
         <div className="ws-grow">
           <strong>{env.key === 'professor' ? '교수 지정 환경' : '기본 환경'}</strong>
-          <small>{env.key === 'professor' ? env.name : '서비스 표준'}</small>
+          {env.key === 'professor' && <small>{env.name}</small>}
         </div>
       </div>
       <Spec env={env} />
-      <p className="ws-note">{NOTE[env.key]}</p>
       <div className="ws-modal-actions">
         <button className="ws-btn" onClick={onClose}>
           닫기

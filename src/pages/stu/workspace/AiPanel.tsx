@@ -103,7 +103,7 @@ export function AiPanel({
         <span className="ws-ai-mark">
           <Sparkles aria-hidden="true" />
         </span>
-        <strong>AI Tutor</strong>
+        <strong>AI</strong>
         <i className={aiAvailable ? 'ws-online' : 'ws-online off'} title={aiAvailable ? '연결됨' : 'AI 키 없음'} />
         <span className="ws-grow" />
         <button className="ws-icon-btn" title="AI 패널 접기" aria-label="AI 패널 접기" onClick={onCollapse}>
@@ -114,14 +114,6 @@ export function AiPanel({
         <div className="ws-chat-divider">
           <span /> 작성 단계 · AI 사용 허용, 모든 대화가 기록돼요 <span />
         </div>
-        {messages.length === 0 && !sending && (
-          <div className="ws-msg ai">
-            <div className="ws-msg-author">
-              <Bot aria-hidden="true" /> Orbit AI
-            </div>
-            <p>코드를 선택하고 질문하면 선택한 범위가 함께 전달돼요. “고쳐줘”라고 하면 수정안을 만들어 에디터에 비교 화면으로 보여 드려요.</p>
-          </div>
-        )}
         {messages.map((m) => {
           if (m.role === 'student') {
             const sel = m.meta?.selection as { start_line?: number; end_line?: number } | null
@@ -142,7 +134,7 @@ export function AiPanel({
           return (
             <div className="ws-msg ai" key={m.id}>
               <div className="ws-msg-author">
-                <Bot aria-hidden="true" /> Orbit AI <span>{clock(m.created_at)}</span>
+                <Bot aria-hidden="true" /> AI <span>{clock(m.created_at)}</span>
               </div>
               <RichText text={m.content} />
               {p && st && (
@@ -227,7 +219,7 @@ export function AiPanel({
           }}
         />
         <div className="ws-composer-bottom">
-          <span>Enter 보내기 · Shift+Enter 줄바꿈</span>
+          <span className="ws-grow" />
           <button type="submit" className="ws-send" aria-label="보내기" disabled={!text.trim() || Boolean(sending) || disabled}>
             <ArrowUp aria-hidden="true" />
           </button>

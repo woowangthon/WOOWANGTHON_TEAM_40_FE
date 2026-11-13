@@ -509,7 +509,7 @@ export default function Landing() {
             <h2>
               결과가 아닌 과정으로.
               <br />
-              지금 시작한다.
+              지금 시작.
             </h2>
             <div>
               <Link to="/signup" className="lp-pill">

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
-import { api, getToken, setToken, type Role, type User } from './api'
+import { api, ApiError, getToken, setToken, type Role, type User } from './api'
 
 interface AuthValue {
   user: User | null
@@ -23,7 +23,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.auth
       .me()
       .then(setUser)
-      .catch(() => setToken(null))
+      .catch((e: unknown) => {
+        // 서버가 토큰을 거절했을 때만 지운다. 서버가 잠깐 응답하지 않은 것이면 남겨 두어 다시 열었을 때 로그인이 이어지게 한다.
+        if (e instanceof ApiError && e.status === 401) setToken(null)
+      })
       .finally(() => setLoading(false))
   }, [])
 

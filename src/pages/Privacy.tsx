@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api } from '../api'
-import { APP_NAME } from '../App'
+import { APP_NAME } from '../nav'
 
 // 무엇을 기록하고 누가 보는지 밝히는 안내.
 export default function Privacy() {

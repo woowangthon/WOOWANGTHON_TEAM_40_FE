@@ -13,7 +13,7 @@ export const vars = (o: Record<string, string | number>) => o as CSSProperties
 
 // 과제가 쓰는 도구에 맞는 미리보기 그림을 고른다.
 export function artOf(toolName: string): Art {
-  if (toolName === 'sql') return 'code'
+  if (toolName === 'workspace' || toolName === 'sql') return 'code'
   if (toolName === 'companion') return 'diagram'
   return 'doc'
 }
@@ -37,16 +37,21 @@ type Theme = 'light' | 'dark'
 const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({ theme: 'light', toggle: () => {} })
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'))
+  const [theme, setTheme] = useState<Theme>(() => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'))
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    try {
-      localStorage.setItem('theme', theme)
-    } catch {
-      // 저장이 막힌 환경에서는 모드를 기억하지 않는다.
-    }
   }, [theme])
-  const toggle = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+  // 사용자가 직접 바꿨을 때만 기억한다. 바꾼 적이 없으면 어느 기기에서나 다크 모드로 열린다.
+  const toggle = () =>
+    setTheme((t) => {
+      const next = t === 'dark' ? 'light' : 'dark'
+      try {
+        localStorage.setItem('prob-theme', next)
+      } catch {
+        // 저장이 막힌 환경에서는 모드를 기억하지 않는다.
+      }
+      return next
+    })
   return <ThemeCtx.Provider value={{ theme, toggle }}>{children}</ThemeCtx.Provider>
 }
 

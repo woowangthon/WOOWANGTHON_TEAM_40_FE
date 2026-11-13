@@ -89,7 +89,6 @@ export function OutputPanel({
             <div className="ws-running">
               <span className="ws-spinner" />
               <strong>코드를 실행하고 있습니다</strong>
-              <small>실행 직전 내용을 커밋하고 격리 환경을 준비하는 중...</small>
             </div>
           ) : error && tab !== 'stdin' ? (
             <div className="ws-run-error">

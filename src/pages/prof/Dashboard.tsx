@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { LayoutGrid, List, Plus, Search } from 'lucide-react'
 
 import type { DashboardRow } from '../../api'
-import { STATUS_LABEL, STATUS_TONE } from '../../nav'
+import { shownStatus, STATUS_LABEL, STATUS_TONE } from '../../nav'
 import { useProfHome } from '../../shells'
 import { ArtIcon, artOf, dateTime, HBar, Loading, Notice, PageHead, Status, Thumb, vars } from '../../ui'
 
@@ -29,7 +29,8 @@ export default function Dashboard() {
   }
   if (!data) return <Loading />
 
-  const list = data.rows.filter((r) => (!status || r.status === status) && (!course || r.subject === course) && r.title.includes(q.trim()))
+  // 사이드바의 상태 묶음과 같은 기준을 쓴다. 공개한 과제는 마감 시각이 지나면 마감이다.
+  const list = data.rows.filter((r) => (!status || shownStatus(r) === status) && (!course || r.subject === course) && r.title.includes(q.trim()))
   const title = status ? STATUS_LABEL[status as DashboardRow['status']] ?? '최근 과제' : (course ?? '최근 과제')
 
   return (
@@ -85,7 +86,7 @@ export default function Dashboard() {
                     <ArtIcon kind={artOf(r.tool_name)} />
                     <span>{r.title}</span>
                   </span>
-                  <Status tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Status>
+                  <Status tone={STATUS_TONE[shownStatus(r)]}>{STATUS_LABEL[shownStatus(r)]}</Status>
                 </div>
                 <div className="line">
                   <div style={{ flex: 1 }}>
@@ -123,7 +124,7 @@ export default function Dashboard() {
                     </td>
                     <td>{r.subject}</td>
                     <td>
-                      <Status tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Status>
+                      <Status tone={STATUS_TONE[shownStatus(r)]}>{STATUS_LABEL[shownStatus(r)]}</Status>
                     </td>
                     <td className="num">{r.deadline ? dateTime(r.deadline) : '정하지 않음'}</td>
                     <td className="r">{progress(r)}</td>

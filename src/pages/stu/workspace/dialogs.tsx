@@ -160,7 +160,7 @@ export function BriefDialog({
         </p>
         <h3 className="ws-brief-title">{title}</h3>
       </div>
-      <p className="ws-brief-body">{description || '교수가 과제 설명을 쓰지 않았다'}</p>
+      <p className="ws-brief-body">{description || '과제 설명 미입력'}</p>
       <dl className="ws-dl">
         <dt>기본 파일</dt>
         <dd className="ws-brief-files">

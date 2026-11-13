@@ -323,7 +323,7 @@ export default function LearningStage({ enrollment, onDone }: { enrollment: Enro
           <div className="block">
             <h2>
               <ScrollText aria-hidden="true" />
-              교수가 안내한 규칙
+              규칙
             </h2>
             <ul className="rule-list">
               {state.student_rules.map((r, i) => (
@@ -423,14 +423,14 @@ export default function LearningStage({ enrollment, onDone }: { enrollment: Enro
         <div className="block">
           <h2>
             <ClipboardX aria-hidden="true" />
-            사전평가에서 틀린 문항
+            틀린 문항
           </h2>
           {preError ? (
             <Notice kind="error">{preError}</Notice>
           ) : pre === undefined ? (
             <Loading />
           ) : wrong.length === 0 ? (
-            <div className="empty">{pre ? '사전평가에서 틀린 문항이 없다' : '사전평가 결과가 없다'}</div>
+            <div className="empty">{pre ? '틀린 문항이 없다' : '사전평가 결과가 없다'}</div>
           ) : (
             <>
               <SourceLegend />

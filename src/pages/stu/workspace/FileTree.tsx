@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, FileCode, FilePlus, FileText, Folder, FolderOpen, FolderPlus, Lock, Pencil, Trash2 } from 'lucide-react'
+import { Notice } from '../../../ui'
+import { Modal } from './dialogs'
 import type { WsFile } from './wsApi'
 
 type Node = { name: string; path: string; folders: Node[]; files: WsFile[] }
@@ -92,7 +94,7 @@ function NameInput({ initial, depth, icon, onSubmit, onCancel }: { initial: stri
           aria-label="이름"
         />
       </div>
-      <small className={error ? 'ws-alert' : 'soft'}>{error ?? 'Enter 확인 · Esc 취소 · 슬래시(/)로 폴더 지정'}</small>
+      {error && <small className="ws-alert">{error}</small>}
     </div>
   )
 }
@@ -122,6 +124,8 @@ export function FileTree({
   const [emptyFolders, setEmptyFolders] = useState<string[]>([])
   const [creating, setCreating] = useState<{ parent: string; kind: 'file' | 'folder'; initial: string } | null>(null)
   const [renaming, setRenaming] = useState<{ path: string; folder: boolean } | null>(null)
+  // 지우기 전에 화면 안의 창으로 한 번 확인한다. 지우지 못하면 같은 창에 이유를 보여 준다
+  const [removing, setRemoving] = useState<{ path: string; folder: boolean; count: number; busy: boolean; error: string | null } | null>(null)
   const tree = useMemo(() => buildTree(files, emptyFolders), [files, emptyFolders])
 
   useEffect(() => {
@@ -159,15 +163,20 @@ export function FileTree({
     setRenaming(null)
   }
 
-  const remove = async (path: string, folder: boolean) => {
+  const remove = (path: string, folder: boolean) => {
     if (folder && onlyLocal(path)) return setEmptyFolders((l) => l.filter((f) => f !== path))
     const count = folder ? files.filter((f) => f.path.startsWith(`${path}/`)).length : 1
-    const msg = folder ? `${path} 폴더와 안의 파일 ${count}개를 지울까요?\n지운 내용은 수정 이력에 남는다.` : `${path} 파일을 지울까요?\n지운 내용은 수정 이력에 남는다.`
-    if (!window.confirm(msg)) return
+    setRemoving({ path, folder, count, busy: false, error: null })
+  }
+
+  const confirmRemove = async () => {
+    if (!removing || removing.busy) return
+    setRemoving({ ...removing, busy: true, error: null })
     try {
-      await onDelete(path, folder)
+      await onDelete(removing.path, removing.folder)
+      setRemoving(null)
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      setRemoving({ ...removing, busy: false, error: e instanceof Error ? e.message : String(e) })
     }
   }
 
@@ -211,7 +220,7 @@ export function FileTree({
                         <button title="이름 바꾸기" onClick={() => setRenaming({ path: folder.path, folder: true })}>
                           <Pencil aria-hidden="true" />
                         </button>
-                        <button title="폴더 삭제" onClick={() => void remove(folder.path, true)}>
+                        <button title="폴더 삭제" onClick={() => remove(folder.path, true)}>
                           <Trash2 aria-hidden="true" />
                         </button>
                       </>
@@ -263,7 +272,7 @@ export function FileTree({
                   <button title="이름 바꾸기" onClick={() => setRenaming({ path: f.path, folder: false })}>
                     <Pencil aria-hidden="true" />
                   </button>
-                  <button title="파일 삭제" onClick={() => void remove(f.path, false)}>
+                  <button title="파일 삭제" onClick={() => remove(f.path, false)}>
                     <Trash2 aria-hidden="true" />
                   </button>
                 </span>
@@ -314,6 +323,22 @@ export function FileTree({
             </div>
           )}
         </div>
+      )}
+      {removing && (
+        <Modal title={removing.folder ? '폴더를 지운다' : '파일을 지운다'} onClose={() => !removing.busy && setRemoving(null)}>
+          <p>
+            {removing.folder ? `${removing.path} 폴더와 그 안의 파일 ${removing.count}개를 지운다.` : `${removing.path} 파일을 지운다.`} 지운 내용은 수정 이력에 남는다
+          </p>
+          {removing.error && <Notice kind="error">{removing.error}</Notice>}
+          <div className="ws-modal-actions">
+            <button className="btn" onClick={() => setRemoving(null)} disabled={removing.busy}>
+              취소
+            </button>
+            <button className="btn primary" onClick={() => void confirmRemove()} disabled={removing.busy}>
+              {removing.busy ? '지우는 중' : '지우기'}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   )

@@ -41,11 +41,11 @@ export function SourceLegend() {
   )
 }
 
-// 서버가 준 근거가 비어 있는 답안은 채점 방식에서 근거 한 줄을 만든다.
+// 글로 보여 줄 근거. 정답 비교로 채점한 답은 근거가 늘 같은 문장이라 글로 적지 않고 표시 색으로만 알린다.
 function basisOf(a: TestAnswer): AnswerBasis[] {
+  if (a.graded_by === 'auto') return []
   const given = a.basis.filter((b) => b.text.trim() && SOURCES.some((s) => s.source === b.source))
   if (given.length > 0) return given
-  if (a.graded_by === 'auto') return [{ source: 'criteria', text: '교수가 정한 정답과 비교해 채점했다' }]
   if (!a.feedback) return []
   return [{ source: a.graded_by === 'professor' ? 'criteria' : 'ai', text: a.feedback }]
 }
@@ -82,7 +82,8 @@ function markParts(text: string, spans: string[]): { t: string; bad: boolean }[]
   return parts
 }
 
-// 채점한 문항 하나. 문항과 내 답과 점수와 채점 근거를 보여 주고 틀린 부분은 빨갛게 표시한다.
+// 채점한 문항 하나. 문항과 내 답과 점수를 보여 주고 틀린 부분은 근거의 출처 색으로 표시한다.
+// AI 가 찾아낸 부분은 AI 판단 색, 정답 비교나 교수 채점으로 틀린 부분은 교수 채점 기준 색이다.
 export function AnswerReview({
   a,
   no,
@@ -103,6 +104,7 @@ export function AnswerReview({
   const cut = wrong && a.graded_by === 'auto'
   const parts = cut ? [{ t: a.answer_text, bad: true }] : markParts(a.answer_text, a.wrong_spans)
   const basis = basisOf(a)
+  const markCls = a.graded_by === 'ai' ? 'src-ai' : 'src-rule'
 
   return (
     <article className="wrong-item" style={vars({ '--i': i })}>
@@ -121,14 +123,14 @@ export function AnswerReview({
             {a.answer_text
               ? parts.map((p, k) =>
                   p.bad ? (
-                    <mark key={k} className={cut ? 'bad cut' : 'bad'}>
+                    <mark key={k} className={cut ? `bad cut ${markCls}` : `bad ${markCls}`}>
                       {p.t}
                     </mark>
                   ) : (
                     <span key={k}>{p.t}</span>
                   ),
                 )
-              : '쓰지 않았다'}
+              : '미입력'}
           </dd>
           {a.expected_answer && (
             <>
@@ -560,11 +562,6 @@ export default function TestStage({
             <span className="end">
               {started.items.length}개 중 {answered}개
             </span>
-          </div>
-          <div className="row">
-            <MessageSquareOff aria-hidden="true" />
-            <span>AI 도움</span>
-            <span className="end">시험 중 없음</span>
           </div>
         </div>
         <nav className="qnav" aria-label="문항 이동">

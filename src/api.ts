@@ -280,17 +280,6 @@ export interface TaskState {
   google_last_synced_at: string | null
 }
 
-export interface SubmitResult {
-  task: TaskState
-  warning: string | null
-}
-
-export interface GoogleSync {
-  task: TaskState
-  added: number
-  doc_id: string
-}
-
 export interface Summary {
   id: number
   kind: 'learning' | 'task'
@@ -409,19 +398,6 @@ export interface StudentDetail {
   grade: Grade | null
 }
 
-export interface CompanionMe {
-  enrollment_id: number
-  student_name: string
-  assignment_title: string
-  tool_config: Record<string, unknown>
-  attempt_no: number | null
-  deadline: string | null
-  deadline_passed: boolean
-  consent_text: string
-  snapshot_seconds: number
-  ai_panel_path: string
-}
-
 const TOKEN_KEY = 'woowang_token'
 
 export function getToken(): string | null {
@@ -452,21 +428,28 @@ export class ApiError extends Error {
 interface RequestOptions {
   body?: unknown
   form?: FormData
-  companionToken?: string
 }
+
+// 서버에 닿지 못했을 때의 안내. 브라우저가 주는 영어 문장 대신 보여 준다.
+const OFFLINE = '서버에 연결하지 못했다. 잠시 뒤 다시 시도한다'
 
 export async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {}
   const token = getToken()
-  if (opts.companionToken) headers['X-Companion-Token'] = opts.companionToken
-  else if (token) headers.Authorization = `Bearer ${token}`
+  if (token) headers.Authorization = `Bearer ${token}`
   let body: BodyInit | undefined
   if (opts.form) body = opts.form
   else if (opts.body !== undefined) {
     headers['Content-Type'] = 'application/json'
     body = JSON.stringify(opts.body)
   }
-  const res = await fetch(path, { method, headers, body })
+  let res: Response
+  try {
+    res = await fetch(path, { method, headers, body })
+  } catch {
+    // 연결이 끊겼거나 서버가 다시 뜨는 중이다. 상태 번호 0 으로 구분한다.
+    throw new ApiError(0, OFFLINE)
+  }
   if (res.status === 204) return undefined as T
   const text = await res.text()
   let data: unknown = null
@@ -475,7 +458,7 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
   } catch {
     data = text
   }
-  if (res.status === 401 && token && !opts.companionToken && !path.startsWith('/api/auth/')) {
+  if (res.status === 401 && token && !path.startsWith('/api/auth/')) {
     // 토큰이 만료되었거나 무효다. 로그인 화면으로 보내고 그 이유를 남긴다.
     setToken(null)
     try {
@@ -486,7 +469,7 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
     window.dispatchEvent(new Event('woowang-auth-expired'))
   }
   if (!res.ok) {
-    let detail = `요청 실패 (${res.status})`
+    let detail = `서버가 요청을 처리하지 못했다. 상태 번호 ${res.status}`
     if (data && typeof data === 'object' && 'detail' in data) {
       const d = (data as { detail: unknown }).detail
       detail = typeof d === 'string' ? d : JSON.stringify(d)
@@ -496,12 +479,16 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
   return data as T
 }
 
-export async function fetchBlobUrl(path: string, companionToken?: string): Promise<string> {
+export async function fetchBlobUrl(path: string): Promise<string> {
   const headers: Record<string, string> = {}
   const token = getToken()
-  if (companionToken) headers['X-Companion-Token'] = companionToken
-  else if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(path, { headers })
+  if (token) headers.Authorization = `Bearer ${token}`
+  let res: Response
+  try {
+    res = await fetch(path, { headers })
+  } catch {
+    throw new ApiError(0, OFFLINE)
+  }
   if (!res.ok) throw new ApiError(res.status, '파일을 불러오지 못했다')
   return URL.createObjectURL(await res.blob())
 }
@@ -526,7 +513,6 @@ export const api = {
       request<{ token: string; user: User }>('POST', '/api/auth/social/exchange', { body: { ticket } }),
   },
   prof: {
-    list: () => request<AssignmentBrief[]>('GET', '/api/assignments'),
     dashboard: () => request<Dashboard>('GET', '/api/assignments/dashboard'),
     create: (body: Partial<Assignment> & { title: string }) =>
       request<Assignment>('POST', '/api/assignments', { body }),
@@ -595,38 +581,8 @@ export const api = {
         body: { answer },
       }),
     finishLearning: (eid: number) => request<LearningState>('POST', `/api/enrollments/${eid}/learning/finish`),
+    // 결과 요약이 제출 시도와 버전 수를 읽는다. 작업공간의 편집과 제출은 pages/stu/workspace/wsApi.ts 가 맡는다.
     task: (eid: number) => request<TaskState>('GET', `/api/enrollments/${eid}/task`),
-    newAttempt: (eid: number) => request<TaskState>('POST', `/api/enrollments/${eid}/task/attempts`),
-    saveVersion: (
-      eid: number,
-      body: { text_content: string; reason: string; source: string; meta?: Record<string, unknown> },
-    ) => request<TaskState>('POST', `/api/enrollments/${eid}/task/versions`, { body }),
-    saveFileVersion: (eid: number, file: File, reason: string, source: string) => {
-      const form = new FormData()
-      form.append('file', file)
-      form.append('reason', reason)
-      form.append('source', source)
-      return request<TaskState>('POST', `/api/enrollments/${eid}/task/versions/file`, { form })
-    },
-    versionFilePath: (eid: number, vid: number) => `/api/enrollments/${eid}/task/versions/${vid}/file`,
-    taskChat: (eid: number, message: string) =>
-      request<ChatMessage[]>('POST', `/api/enrollments/${eid}/task/chat`, { body: { message } }),
-    submit: (eid: number) => request<SubmitResult>('POST', `/api/enrollments/${eid}/task/submit`),
-    companionToken: (eid: number) =>
-      request<{ token: string }>('POST', `/api/enrollments/${eid}/companion/token`),
-    googleAuthUrl: (eid: number) => request<{ url: string }>('GET', `/api/enrollments/${eid}/google/auth-url`),
-    googleSetDoc: (eid: number, doc_url: string) =>
-      request<GoogleSync>('POST', `/api/enrollments/${eid}/google/doc`, { body: { doc_url } }),
-    googleSync: (eid: number) => request<GoogleSync>('POST', `/api/enrollments/${eid}/google/sync`),
-    googleDisconnect: (eid: number) => request<TaskState>('DELETE', `/api/enrollments/${eid}/google`),
-  },
-  companion: {
-    me: (token: string) => request<CompanionMe>('GET', '/api/companion/me', { companionToken: token }),
-    messages: (token: string) =>
-      request<ChatMessage[]>('GET', '/api/companion/messages', { companionToken: token }),
-    chat: (token: string, message: string) =>
-      request<ChatMessage[]>('POST', '/api/companion/chat', { body: { message }, companionToken: token }),
-    task: (token: string) => request<TaskState>('GET', '/api/companion/task', { companionToken: token }),
   },
 }
 

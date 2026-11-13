@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, Check, ChevronRight, Circle, GitCommitHorizontal, History, Info, Monitor, PanelLeftClose, PanelLeftOpen, PanelRightOpen, SquareFunction, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronRight, Circle, GitCommitHorizontal, History, Info, Monitor, PanelLeftClose, PanelLeftOpen, PanelRightOpen, SquareFunction, TriangleAlert, X } from 'lucide-react'
 import { ApiError, type Enrollment } from '../../../api'
 import { Loading, Notice } from '../../../ui'
 import { AiPanel, type AiContext } from './AiPanel'
@@ -98,6 +98,8 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
   const [submitBusy, setSubmitBusy] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  // 자동 저장이 실패한 이유. 다음 저장이 되면 지운다
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -145,7 +147,12 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
           const r = await ws.commit(eid, { path, content, trigger, author, paste: paste ? { chars: paste.chars, lines: paste.lines } : undefined })
           committedRef.current[path] = content
           if (r.commit) setCommits((l) => [r.commit!, ...l])
+          setSaveError(null)
           return r.commit
+        } catch (e) {
+          // 저장하지 못한 것을 화면에 알린다. 고친 내용은 화면에 남아 있어 다음 저장 때 다시 보낸다
+          setSaveError(errorText(e))
+          throw e
         } finally {
           setSaving((n) => n - 1)
         }
@@ -186,7 +193,11 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
       window.clearTimeout(idleTimer.current)
       for (const p of Object.keys(contentsRef.current).filter(isDirty)) await commitFile(p, trigger)
       for (const p of Object.keys(docDirty.current)) await commitDoc(p, trigger).catch(() => null)
-      if (!Object.keys(contentsRef.current).some(isDirty)) dirtySince.current = null
+      if (!Object.keys(contentsRef.current).some(isDirty)) {
+        dirtySince.current = null
+        // 남은 변경이 없으면 앞서 띄운 저장 실패 안내를 걷는다
+        setSaveError(null)
+      }
     },
     [commitFile, commitDoc],
   )
@@ -200,7 +211,8 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
 
   useEffect(() => {
     const t = window.setInterval(() => {
-      if (dirtySince.current && Date.now() - dirtySince.current >= FORCE_MS) void commitAll('interval')
+      // 뒤에서 도는 저장은 실패해도 여기서 멈춘다. 실패한 이유는 sendCommit 이 화면에 알린다
+      if (dirtySince.current && Date.now() - dirtySince.current >= FORCE_MS) void commitAll('interval').catch(() => undefined)
       const cur = activeRef.current
       if (openedDocsRef.current.includes(cur)) docDirty.current[cur] ??= Date.now()
       for (const [p, since] of Object.entries(docDirty.current)) if (Date.now() - since >= IDLE_MS) void commitDoc(p, 'idle').catch(() => null)
@@ -216,7 +228,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
     return () => {
       window.removeEventListener('beforeunload', onUnload)
       // 다른 단계로 이동할 때도 남은 변경을 커밋한다
-      void commitAll('leave')
+      void commitAll('leave').catch(() => undefined)
     }
   }, [eid, commitAll])
 
@@ -229,7 +241,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
     lastFocus.current = 'editor'
     dirtySince.current ??= Date.now()
     window.clearTimeout(idleTimer.current)
-    idleTimer.current = window.setTimeout(() => void commitAll('idle'), IDLE_MS)
+    idleTimer.current = window.setTimeout(() => void commitAll('idle').catch(() => undefined), IDLE_MS)
   }
 
   const onEditorPaste = (info: PasteInfo) => {
@@ -258,7 +270,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
   const open = (name: string) => {
     const prev = activeRef.current
     if (prev && prev !== name) {
-      void commitFile(prev, 'file_switch')
+      void commitFile(prev, 'file_switch').catch(() => undefined)
       if (openedDocsRef.current.includes(prev)) docDirty.current[prev] ??= Date.now()
       void commitDoc(prev, 'file_switch').catch(() => null)
       logEvent('file_switch', name, { from: prev })
@@ -358,7 +370,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
     if (lastFocus.current === 'ai') return
     lastFocus.current = 'ai'
     logEvent('focus_ai', activeRef.current)
-    void commitAll('focus_ai')
+    void commitAll('focus_ai').catch(() => undefined)
   }
 
   const sendChat = async (text: string) => {
@@ -444,7 +456,10 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
       await commitAll('submit')
       const r = await ws.submit(eid)
       setConfirming(false)
-      onChanged(r.warning ?? '과제를 제출했다. 이제 사후평가를 본다')
+      // 제출하면 시도가 닫힌다. 작업공간을 다시 받아 읽기 전용 표시와 재제출 버튼이 맞게 나오게 한다
+      await load()
+      // 첫 제출만 사후평가로 이어진다. 재제출은 과제 단계에서 끝난다
+      onChanged(r.warning ?? (enrollment.stage === 'task' ? '과제를 제출했다. 이제 사후평가를 본다' : '과제를 다시 제출했다. 마감 전에는 다시 시도할 수 있다'))
     } catch (e) {
       setSubmitError(errorText(e))
     } finally {
@@ -588,7 +603,23 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
                 const f = w.files.find((x) => x.path === t)
                 if (!f) return null
                 return (
-                  <div key={t} role="tab" aria-selected={t === active} className={t === active ? 'ws-tab active' : 'ws-tab'} onClick={() => open(t)} title={t}>
+                  <div
+                    key={t}
+                    role="tab"
+                    tabIndex={0}
+                    aria-selected={t === active}
+                    className={t === active ? 'ws-tab active' : 'ws-tab'}
+                    onClick={() => open(t)}
+                    onKeyDown={(e) => {
+                      // 탭 안의 닫기 버튼에서 누른 키는 그 버튼이 처리한다
+                      if (e.target !== e.currentTarget) return
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        open(t)
+                      }
+                    }}
+                    title={t}
+                  >
                     <FileIcon kind={f.kind} />
                     <span className="ws-ellipsis">{t}</span>
                     {changed.has(t) && <i className="ws-dot" />}
@@ -616,6 +647,10 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
                 <>
                   <span className="ws-mini-spinner" /> 저장 중
                 </>
+              ) : saveError ? (
+                <span className="ws-alert">
+                  <TriangleAlert aria-hidden="true" /> 저장하지 못했다
+                </span>
               ) : editable ? (
                 <>
                   <Check aria-hidden="true" /> 자동 저장
@@ -629,7 +664,7 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
             <button
               className="ws-btn"
               onClick={() => {
-                void commitAll('open_history')
+                void commitAll('open_history').catch(() => undefined)
                 setHistory(true)
               }}
             >
@@ -652,6 +687,11 @@ export default function WorkspaceStage({ enrollment, onChanged }: { enrollment: 
               <Notice kind="error" onClose={() => setNotice(null)}>
                 {notice}
               </Notice>
+            </div>
+          )}
+          {saveError && (
+            <div className="ws-pad">
+              <Notice kind="error">고친 내용을 저장하지 못했다. {saveError}</Notice>
             </div>
           )}
 

@@ -1,146 +1,225 @@
 /* 과제 현황과 학생 기록 화면에서만 쓰는 규칙. 색과 선은 design.css 의 토큰만 쓴다.
    모든 규칙을 prof-status 아래에 두어 다른 화면에는 닿지 않게 한다. */
-@scope (:root) to (.legacy) {
-  /* 목록 줄 오른쪽의 값. 막대 옆에서 자리 폭을 맞춘다. */
-  .prof-status .row .val {
-    width: 48px;
-    flex: none;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
+/* 목록 줄 오른쪽의 값. 막대 옆에서 자리 폭을 맞춘다. */
+.prof-status .row .val {
+  width: 48px;
+  flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.prof-status .row .val.wide {
+  width: 136px;
+}
+
+.prof-status .row .bars {
+  display: grid;
+  gap: 4px;
+}
+
+.prof-status .row .who {
+  flex: none;
+  font-weight: 600;
+}
+
+.prof-status .row .line {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+/* 표 */
+.prof-status .table td.act {
+  width: 40px;
+}
+
+.prof-status .table .nowrap {
+  white-space: nowrap;
+}
+
+.prof-status .table td.text {
+  min-width: 160px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 펼치고 닫을 때 글자가 바뀌어도 표의 칸 폭이 흔들리지 않게 한다. */
+.prof-status .table .btn.toggle {
+  min-width: 84px;
+}
+
+/* 답안 줄 아래에 펼치는 정답과 채점 확인 */
+.prof-status .table tr.detail > td {
+  height: auto;
+  padding: 14px 16px 16px;
+}
+
+.prof-status .ans.wide {
+  grid-template-columns: 136px minmax(0, 1fr);
+}
+
+.prof-status .ans.wide dd {
+  white-space: pre-wrap;
+}
+
+.prof-status .override {
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.prof-status .override .grow {
+  flex: 1;
+  min-width: 200px;
+}
+
+.prof-status .override + .error-text {
+  margin-top: 8px;
+}
+
+.prof-status .grade-form {
+  max-width: 640px;
+}
+
+.prof-status .meta + .table-wrap,
+.prof-status .meta + .rows {
+  margin-top: 12px;
+}
+
+/* 학생 기록의 탭. 좁은 창에서는 옆으로 민다. */
+.prof-status .tabs.fit {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.prof-status .tabs.fit .tab {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* 대화 기록. 시각, 단계, 말한 쪽, 내용 순서다. */
+.prof-status .log.talk .log-row {
+  grid-template-columns: 112px 96px minmax(0, 1fr);
+}
+
+.prof-status .log.talk.staged .log-row {
+  grid-template-columns: 112px 84px 96px minmax(0, 1fr);
+}
+
+.prof-status .log.talk .who {
+  font-weight: 600;
+}
+
+.prof-status .log.talk .text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 결과물 변경 이력. 왼쪽은 버전 목록이고 오른쪽은 고른 버전의 기록과 앞 버전과 달라진 줄이다. */
+.prof-status .history {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* 변경 내용이 길어 화면을 내려도 목록은 따라온다. */
+.prof-status .history > .rows {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.prof-status .history .row[aria-pressed='true'] {
+  background: var(--side-active);
+}
+
+.prof-status .history .row .no {
+  width: 22px;
+  flex: none;
+  color: var(--text-2);
+}
+
+.prof-status .history .row .path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prof-status .history .detail {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.prof-status .history .detail img {
+  max-width: 100%;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r2);
+}
+
+/* 줄 번호, 추가와 삭제 기호, 내용 순서다. 긴 줄은 꺾어서 옆으로 밀지 않게 한다. */
+.prof-status .diff div {
+  grid-template-columns: 36px 14px minmax(0, 1fr);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prof-status .diff .no {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.prof-status .raw {
+  max-height: 480px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r2);
+  background: var(--bg-2);
+  font: 13px/1.6 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+}
+
+@media (max-width: 960px) {
+  .prof-status .history {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .prof-status .history > .rows {
+    position: static;
+    max-height: 280px;
   }
 
   .prof-status .row .val.wide {
-    width: 136px;
-  }
-
-  .prof-status .row .bars {
-    display: grid;
-    gap: 4px;
-  }
-
-  .prof-status .row .who {
-    flex: none;
-    font-weight: 600;
-  }
-
-  .prof-status .row .line {
-    flex: 1;
-    min-width: 0;
-    line-height: 1.55;
-    overflow-wrap: anywhere;
-  }
-
-  /* 표 */
-  .prof-status .table td.act {
-    width: 40px;
-  }
-
-  .prof-status .table .nowrap {
-    white-space: nowrap;
-  }
-
-  .prof-status .table td.text {
-    min-width: 160px;
-    line-height: 1.55;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  /* 펼치고 닫을 때 글자가 바뀌어도 표의 칸 폭이 흔들리지 않게 한다. */
-  .prof-status .table .btn.toggle {
-    min-width: 84px;
-  }
-
-  /* 답안 줄 아래에 펼치는 정답과 채점 확인 */
-  .prof-status .table tr.detail > td {
-    height: auto;
-    padding: 14px 16px 16px;
+    width: auto;
   }
 
   .prof-status .ans.wide {
-    grid-template-columns: 136px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 
   .prof-status .ans.wide dd {
-    white-space: pre-wrap;
+    margin-bottom: 8px;
   }
 
-  .prof-status .override {
-    flex-wrap: wrap;
-    margin-top: 14px;
-  }
-
-  .prof-status .override .grow {
-    flex: 1;
-    min-width: 200px;
-  }
-
-  .prof-status .override + .error-text {
-    margin-top: 8px;
-  }
-
-  .prof-status .grade-form {
-    max-width: 640px;
-  }
-
-  .prof-status .meta + .table-wrap,
-  .prof-status .meta + .rows {
-    margin-top: 12px;
-  }
-
-  /* 학생 기록의 탭. 좁은 창에서는 옆으로 민다. */
-  .prof-status .tabs.fit {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .prof-status .tabs.fit .tab {
-    flex: none;
-    white-space: nowrap;
-  }
-
-  /* 대화 기록. 시각, 단계, 말한 쪽, 내용 순서다. */
-  .prof-status .log.talk .log-row {
-    grid-template-columns: 112px 96px minmax(0, 1fr);
-  }
-
+  .prof-status .log.talk .log-row,
   .prof-status .log.talk.staged .log-row {
-    grid-template-columns: 112px 84px 96px minmax(0, 1fr);
-  }
-
-  .prof-status .log.talk .who {
-    font-weight: 600;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    padding: 10px 12px;
   }
 
   .prof-status .log.talk .text {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  @media (max-width: 960px) {
-    .prof-status .row .val.wide {
-      width: auto;
-    }
-
-    .prof-status .ans.wide {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 2px;
-    }
-
-    .prof-status .ans.wide dd {
-      margin-bottom: 8px;
-    }
-
-    .prof-status .log.talk .log-row,
-    .prof-status .log.talk.staged .log-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 2px 12px;
-      padding: 10px 12px;
-    }
-
-    .prof-status .log.talk .text {
-      flex: 1 1 100%;
-    }
+    flex: 1 1 100%;
   }
 }

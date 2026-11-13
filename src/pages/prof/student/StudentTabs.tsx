@@ -2,18 +2,14 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, Search, TriangleAlert } from 'lucide-react'
 
-import { api, formatDate, MODE_LABEL, type Phase } from '../../../api'
-import VersionList from '../../../components/VersionList'
+import { api, type Phase } from '../../../api'
 import { statusNav } from '../../../nav'
-import { HBar, Meta, Section, Status, type Tone } from '../../../ui'
+import { HBar, Meta, Section, Status } from '../../../ui'
 import { Empty, learningState, letterOf, round1, stageState, taskState, when, type State } from '../status/shared'
-import { AnswerTable, GradeForm, Log, SIGNAL_LABEL, STATUS_LABEL, SummaryView } from '../studentParts'
+import { AnswerTable, GradeForm, Log, SIGNAL_LABEL, SummaryView, VersionHistory } from '../studentParts'
 import { useStudent } from './StudentLayout'
 
 const points = (v: number | null) => (v === null ? '' : `${round1(v)}점`)
-
-// AI 요약이 역량마다 붙인 상태의 점 색
-const SUMMARY_TONE: Record<string, Tone> = { sufficient: 'done', in_progress: 'doing', insufficient: 'alert' }
 
 // 제한 시간을 넘겨 낸 시험에만 붙는 요약 칸
 const timeExceeded: [string, ReactNode] = ['제한 시간', <Status tone="alert">초과</Status>]
@@ -179,7 +175,6 @@ export function LearningTab() {
   if (!summary && msgs.length === 0 && d.checks.length === 0) {
     return <Empty>{noGoal ? '모든 역량이 통과 점수를 넘어 학습 단계가 없었다' : '아직 학습을 시작하지 않았다'}</Empty>
   }
-  const c = summary?.content
 
   return (
     <>
@@ -193,52 +188,10 @@ export function LearningTab() {
       />
 
       <Section title="항목별 AI 학습과정 요약" aside={summary ? <span className="num">{when(summary.created_at)} 작성</span> : undefined}>
-        {c ? (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>항목</th>
-                  <th>상태</th>
-                  <th>요약</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(c.competencies ?? []).map((x, i) => (
-                  <tr key={i}>
-                    <td className="strong">{x.competency_name}</td>
-                    <td>
-                      <Status tone={SUMMARY_TONE[x.status] ?? 'todo'}>{STATUS_LABEL[x.status] ?? x.status}</Status>
-                    </td>
-                    <td className="text">{x.line}</td>
-                  </tr>
-                ))}
-                {c.spec_summary && (
-                  <tr>
-                    <td className="strong">스펙</td>
-                    <td />
-                    <td className="text">{c.spec_summary}</td>
-                  </tr>
-                )}
-                {c.learned_summary && (
-                  <tr>
-                    <td className="strong">학습 내용</td>
-                    <td />
-                    <td className="text">{c.learned_summary}</td>
-                  </tr>
-                )}
-                {c.ai_usage_line && (
-                  <tr>
-                    <td className="strong">AI 사용 방식</td>
-                    <td />
-                    <td className="text">{c.ai_usage_line}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        {summary ? (
+          <SummaryView s={summary} />
         ) : (
-          <Empty>학습 단계가 끝나면 생긴다</Empty>
+          <Empty>아직 요약이 없다</Empty>
         )}
       </Section>
 
@@ -318,68 +271,85 @@ export function LearningTab() {
   )
 }
 
-// 결과물 변경 이력과 버전 비교는 팀원이 맡는다. 예전 스타일시트가 적용되도록 legacy 영역으로만 감싼다.
+// 결과물 변경 이력. 시도 하나를 골라 그 시도의 버전과 AI 요약과 AI 대화를 함께 본다.
 export function TaskTab() {
   const { aid, d } = useStudent()
-  if (d.attempts.length === 0)
-    return (
-      <div className="legacy">
-        <p className="muted">아직 과제 단계 기록이 없다.</p>
-      </div>
-    )
+  const [picked, setPicked] = useState<number | null>(null)
+  if (d.attempts.length === 0) return <Empty>아직 과제 단계 기록이 없다</Empty>
+  // 고르지 않았으면 가장 나중 시도를 보여 준다.
+  const t = d.attempts.find((x) => x.id === picked) ?? d.attempts[d.attempts.length - 1]
+  const summary = d.summaries.find((s) => s.kind === 'task' && s.attempt_no === t.attempt_no)
+  const msgs = d.messages.filter((m) => m.stage === 'task' && m.attempt_no === t.attempt_no)
+  const signals = d.signals.filter((s) => s.attempt_no === t.attempt_no)
+  const submitted = t.status === 'submitted'
+
   return (
-    <div className="legacy">
-      <div>
-        {d.attempts.map((t) => {
-          const summary = d.summaries.find((s) => s.kind === 'task' && s.attempt_no === t.attempt_no)
-          const msgs = d.messages.filter((m) => m.stage === 'task' && m.attempt_no === t.attempt_no)
-          const signals = d.signals.filter((s) => s.attempt_no === t.attempt_no)
-          return (
-            <div key={t.id} className="card">
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <h2 style={{ margin: 0 }}>
-                  시도 {t.attempt_no} <span className="chip">{t.status === 'submitted' ? '제출됨' : '진행 중'}</span>
-                </h2>
-                <span className="muted small">
-                  시작 {formatDate(t.started_at)} · 제출 {formatDate(t.submitted_at)} · 버전 {t.versions.length}개
-                </span>
-              </div>
-              {signals.length > 0 && (
-                <div className="banner" style={{ marginTop: 8 }}>
-                  <strong>위반 의심 신호</strong>
-                  <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
-                    {signals.map((s) => (
-                      <li key={s.id} className="small">
-                        <span className="chip chip-warn">{SIGNAL_LABEL[s.kind] ?? s.kind}</span> {s.description}
-                        {s.evidence.text && <span className="muted"> · 근거: {s.evidence.text}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="grid-side" style={{ marginTop: 8 }}>
-                <div>
-                  <VersionList versions={t.versions} filePath={(vid) => api.prof.versionFilePath(aid, d.enrollment_id, vid)} compact />
-                  <div className="placeholder small">직전 버전과의 텍스트 비교와 이미지 비교 화면은 동료가 구현한다. 지금은 버전 원문과 캡처만 보인다.</div>
-                </div>
-                <div>
-                  {summary ? <SummaryView s={summary} /> : <p className="muted small">제출하면 이 시도의 AI 요약이 생긴다.</p>}
-                  <h3 style={{ marginTop: 10 }}>이 시도의 AI 대화 {msgs.length}건</h3>
-                  <div className="chat-log" style={{ maxHeight: 260 }}>
-                    {msgs.map((m) => (
-                      <div key={m.id} className={`bubble ${m.role}`}>
-                        {m.role === 'ai' && <span className="tag">AI · {MODE_LABEL[m.mode] ?? m.mode}</span>}
-                        {m.content}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+    <>
+      {d.attempts.length > 1 && (
+        <div className="toolbar">
+          <div className="seg" role="group" aria-label="시도 고르기">
+            {d.attempts.map((x) => (
+              <button key={x.id} type="button" aria-pressed={x.id === t.id} onClick={() => setPicked(x.id)}>
+                시도 {x.attempt_no}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <Meta
+        items={[
+          ['시도', t.attempt_no],
+          ['상태', <Status tone={submitted ? 'done' : 'doing'}>{submitted ? '제출됨' : '진행 중'}</Status>],
+          ['시작', when(t.started_at)],
+          ['제출', t.submitted_at ? when(t.submitted_at) : '미제출'],
+          ['버전', `${t.versions.length}개`],
+        ]}
+      />
+
+      {signals.length > 0 && (
+        <Section title={`의심 신호 ${signals.length}건`}>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>종류</th>
+                  <th>설명</th>
+                  <th>근거</th>
+                </tr>
+              </thead>
+              <tbody>
+                {signals.map((s) => (
+                  <tr key={s.id}>
+                    <td className="nowrap">
+                      <Status tone="alert">{SIGNAL_LABEL[s.kind] ?? s.kind}</Status>
+                    </td>
+                    <td className="text">{s.description}</td>
+                    <td className="text">{s.evidence.text}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+
+      <VersionHistory key={t.id} versions={t.versions} filePath={(vid) => api.prof.versionFilePath(aid, d.enrollment_id, vid)} />
+
+      <Section title="AI 요약" aside={summary ? <span className="num">{when(summary.created_at)} 작성</span> : undefined}>
+        {summary ? <SummaryView s={summary} /> : <Empty>아직 요약이 없다</Empty>}
+      </Section>
+
+      <Section
+        title={`AI 대화 ${msgs.length}건`}
+        aside={
+          <Link className="btn" to={`/prof/assignments/${aid}/students/${d.enrollment_id}/conversation`}>
+            전체 대화
+          </Link>
+        }
+      >
+        <Log messages={msgs} empty="이 시도의 AI 대화가 없다" />
+      </Section>
+    </>
   )
 }
 

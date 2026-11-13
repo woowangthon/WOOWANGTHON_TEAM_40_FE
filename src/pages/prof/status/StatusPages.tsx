@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import { ChevronRight, ClipboardList, PenLine, Search, TrendingDown, TriangleAlert } from 'lucide-react'
 
 import { api, STAGE_LABEL, type Overview, type OverviewRow, type Stage } from '../../../api'
-import { STATUS_LABEL, STATUS_TONE, statusNav } from '../../../nav'
+import { shownStatus, STATUS_LABEL, STATUS_TONE, statusNav } from '../../../nav'
 import { Columns, CopyButton, CountUp, HBar, Legend, Loading, Meta, Notice, PageHead, Section, Stack, Status, type Group } from '../../../ui'
 import {
   Empty,
@@ -26,8 +26,6 @@ import {
   type StatusCtx,
 } from './shared'
 import './status.css'
-
-export { useStatus } from './shared'
 
 const STAGES: Stage[] = ['pre', 'learning', 'task', 'post', 'done']
 
@@ -116,7 +114,7 @@ export function StatusOverview() {
       </PageHead>
       <Meta
         items={[
-          ['상태', <Status tone={STATUS_TONE[a.status]}>{STATUS_LABEL[a.status]}</Status>],
+          ['상태', <Status tone={STATUS_TONE[shownStatus(a)]}>{STATUS_LABEL[shownStatus(a)]}</Status>],
           ['마감', a.deadline ? when(a.deadline) : '정하지 않음'],
           ['참여 인원', `${n}명`],
           ['과목', a.subject],

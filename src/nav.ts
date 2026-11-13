@@ -63,6 +63,13 @@ export const stageSteps: { key: Stage; label: string; path: string; icon: Lucide
 export const STATUS_LABEL: Record<Assignment['status'], string> = { draft: '작성 중', open: '공개 중', closed: '마감' }
 export const STATUS_TONE: Record<Assignment['status'], Tone> = { draft: 'todo', open: 'doing', closed: 'done' }
 
+// 화면에 보여 줄 과제 상태. 서버는 마감이 지나도 상태를 바꾸지 않으므로 공개한 과제의 마감 시각이 지났으면 마감으로 본다.
+export function shownStatus(a: Pick<Assignment, 'status' | 'deadline'>): Assignment['status'] {
+  if (a.status !== 'open' || !a.deadline) return a.status
+  const at = new Date(a.deadline.endsWith('Z') || a.deadline.includes('+') ? a.deadline : `${a.deadline}Z`).getTime()
+  return at < Date.now() ? 'closed' : 'open'
+}
+
 // 설정 구역이 끝났는지 알려 준다. true 완료, false 미완, null 선택 사항.
 export function sectionDone(a: Assignment, key: string): boolean | null {
   switch (key) {

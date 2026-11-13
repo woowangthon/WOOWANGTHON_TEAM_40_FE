@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight, Download, FileCode2, FileText, ImageIcon, Paperclip, Plus, Trash2 } from 'lucide-react'
 
 import {
@@ -9,6 +9,7 @@ import {
   toLocalInput,
   type Assignment,
   type AssignmentEnv,
+  type EnvSpec,
   type CompetencyInput,
   type ItemInput,
   type ItemType,
@@ -53,21 +54,49 @@ function useSaved(): [boolean, () => void] {
 }
 
 // 구역 아래쪽. 저장 버튼과 다음 구역으로 가는 버튼을 둔다. 저장할 것이 없는 구역은 다음 구역 버튼만 둔다.
-export function Foot({ section, onSave, saved = false, busy = false }: { section: string; onSave?: () => void; saved?: boolean; busy?: boolean }) {
+// onSave 는 저장에 성공했는지를 돌려준다. dirty 는 저장하지 않은 변경이 있다는 뜻이다.
+export function Foot({
+  section,
+  onSave,
+  dirty = false,
+  saved = false,
+  busy = false,
+}: {
+  section: string
+  onSave?: () => Promise<boolean>
+  dirty?: boolean
+  saved?: boolean
+  busy?: boolean
+}) {
+  const navigate = useNavigate()
   const next = setupNav[setupNav.findIndex(([, path]) => path === section) + 1]
+
+  // 고친 내용이 있으면 먼저 저장하고, 저장에 성공했을 때만 다음 구역으로 간다. 실패하면 오류 알림과 함께 이 구역에 남는다.
+  async function goNext() {
+    if (!next) return
+    if (onSave && dirty && !(await onSave())) return
+    navigate(`../${next[1]}`, { relative: 'path' })
+  }
+
   return (
     <div className="editor-foot setup-foot">
       {onSave && (
-        <button type="button" className="btn primary" onClick={onSave} disabled={busy}>
+        <button type="button" className="btn primary" onClick={() => void onSave()} disabled={busy}>
           저장
         </button>
       )}
-      {next && (
-        <Link className="btn" to={`../${next[1]}`} relative="path">
-          다음 {next[0]}
-          <ChevronRight aria-hidden="true" />
-        </Link>
-      )}
+      {next &&
+        (onSave ? (
+          <button type="button" className="btn" onClick={() => void goNext()} disabled={busy}>
+            다음 {next[0]}
+            <ChevronRight aria-hidden="true" />
+          </button>
+        ) : (
+          <Link className="btn" to={`../${next[1]}`} relative="path">
+            다음 {next[0]}
+            <ChevronRight aria-hidden="true" />
+          </Link>
+        ))}
       <Saved show={saved} />
     </div>
   )
@@ -156,25 +185,27 @@ export function CompetenciesSection({
     }
   }
 
-  async function save() {
-    const name = title.trim()
+  // 서버에 저장된 값과 다른 곳. 바뀐 쪽만 저장하고, 다음 구역으로 갈 때 저장할지도 이것으로 정한다.
+  const name = title.trim()
+  const list = rows.filter((r) => !isBlank(r)).map(toCompetencyInput)
+  const basicChanged = name !== a.title || subject.trim() !== a.subject
+  const listChanged = JSON.stringify(list) !== JSON.stringify(a.competencies.map(toCompetencyInput))
+
+  async function save(): Promise<boolean> {
     if (!name) {
       notify('error', '과제 이름을 입력한다.')
-      return
+      return false
     }
     const unnamed = rows.findIndex((r) => !isBlank(r) && !r.name.trim())
     if (unnamed >= 0) {
       notify('error', `${SYMBOLS[unnamed]} 역량의 이름을 입력한다.`)
-      return
+      return false
     }
     const badScore = rows.findIndex((r) => !isBlank(r) && !(Number.isInteger(r.pass_score) && r.pass_score >= 0 && r.pass_score <= 100))
     if (badScore >= 0) {
       notify('error', `${SYMBOLS[badScore]} 역량의 통과 점수는 0점에서 100점 사이로 정한다.`)
-      return
+      return false
     }
-    const list = rows.filter((r) => !isBlank(r)).map(toCompetencyInput)
-    const basicChanged = name !== a.title || subject.trim() !== a.subject
-    const listChanged = JSON.stringify(list) !== JSON.stringify(a.competencies.map(toCompetencyInput))
     setSaving(true)
     try {
       if (basicChanged) setA(await api.prof.update(a.id, { title: name, subject: subject.trim() }))
@@ -186,8 +217,10 @@ export function CompetenciesSection({
       }
       notify('ok', '기본 정보와 역량을 저장했다.')
       flash()
+      return true
     } catch (e) {
       notify('error', messageOf(e, '저장 실패'))
+      return false
     } finally {
       setSaving(false)
     }
@@ -285,7 +318,7 @@ export function CompetenciesSection({
           </table>
         </div>
       </Section>
-      <Foot section="competencies" onSave={() => void save()} saved={saved} busy={saving} />
+      <Foot section="competencies" onSave={save} dirty={basicChanged || listChanged} saved={saved} busy={saving} />
     </>
   )
 }
@@ -463,17 +496,20 @@ export function TestsSection({
     }
   }
 
+  // 서버에 저장된 값과 다른 시험과 제한 시간. 다음 구역으로 갈 때 저장할지도 이것으로 정한다.
+  const keyOf = (slots: Slots) =>
+    JSON.stringify(
+      comps.map((c) => {
+        const item: ItemInput | undefined = slots[c.id]
+        return item ? toItemInput(item) : null
+      }),
+    )
+  const server = serverSets(a)
+  const changed = PHASES.filter((p) => keyOf(sets[p]) !== keyOf(server[p]))
+  const limitsChanged = limits.pre !== a.pre_time_limit_min || limits.post !== a.post_time_limit_min
+
   // 바뀐 시험만 저장한다. 서버는 응시한 학생이 있는 시험의 문항을 다시 받지 않으므로 손대지 않은 시험은 보내지 않는다.
-  async function save() {
-    const keyOf = (slots: Slots) =>
-      JSON.stringify(
-        comps.map((c) => {
-          const item: ItemInput | undefined = slots[c.id]
-          return item ? toItemInput(item) : null
-        }),
-      )
-    const server = serverSets(a)
-    const changed = PHASES.filter((p) => keyOf(sets[p]) !== keyOf(server[p]))
+  async function save(): Promise<boolean> {
     for (const p of changed) {
       for (let i = 0; i < comps.length; i += 1) {
         const item: ItemInput | undefined = sets[p][comps[i].id]
@@ -482,23 +518,23 @@ export function TestsSection({
           setTab(p)
           setSel(i)
           notify('error', `${PHASE_LABEL[p]}의 ${comps[i].name} 문항에서 ${problem}.`)
-          return
+          return false
         }
       }
     }
-    const limitsChanged = limits.pre !== a.pre_time_limit_min || limits.post !== a.post_time_limit_min
     if (limitsChanged) {
       for (const p of PHASES) {
         if (!(Number.isInteger(limits[p]) && limits[p] >= 1 && limits[p] <= 600)) {
           setTab(p)
           notify('error', `${PHASE_LABEL[p]} 제한 시간은 1분에서 600분 사이로 정한다.`)
-          return
+          return false
         }
       }
     }
     setSaving(true)
     let latest: Assignment | null = null
     let itemsSaved = false
+    let ok = false
     try {
       for (const p of changed) {
         const body = comps.flatMap((c) => {
@@ -515,6 +551,7 @@ export function TestsSection({
       if (limitsChanged) latest = await api.prof.update(a.id, { pre_time_limit_min: limits.pre, post_time_limit_min: limits.post })
       notify('ok', '사전 사후 평가를 저장했다.')
       flash()
+      ok = true
     } catch (e) {
       notify('error', messageOf(e, '저장 실패'))
     } finally {
@@ -523,6 +560,7 @@ export function TestsSection({
       else if (itemsSaved) await reload()
       setSaving(false)
     }
+    return ok
   }
 
   return (
@@ -701,7 +739,7 @@ export function TestsSection({
           </div>
         </div>
       </Section>
-      <Foot section="tests" onSave={() => void save()} saved={saved} busy={saving} />
+      <Foot section="tests" onSave={save} dirty={changed.length > 0 || limitsChanged} saved={saved} busy={saving} />
     </>
   )
 }
@@ -718,7 +756,12 @@ export function TaskProblemSection({ a, onSaved, notify }: { a: Assignment; onSa
   const [downloading, setDownloading] = useState(false)
   const [saved, flash] = useSaved()
 
-  async function save() {
+  // 서버에 저장된 값과 다른지 본다. 마감은 화면에 보이는 분 단위까지만 견준다.
+  const stored = toLocalInput(a.deadline)
+  const dirty =
+    taskKind !== a.task_kind || description !== a.description || date !== stored.slice(0, 10) || (date !== '' && (time || '23:59') !== stored.slice(11))
+
+  async function save(): Promise<boolean> {
     setSaving(true)
     try {
       onSaved(
@@ -731,8 +774,10 @@ export function TaskProblemSection({ a, onSaved, notify }: { a: Assignment; onSa
       )
       notify('ok', '과제 문제를 저장했다.')
       flash()
+      return true
     } catch (e) {
       notify('error', messageOf(e, '저장 실패'))
+      return false
     } finally {
       setSaving(false)
     }
@@ -832,7 +877,7 @@ export function TaskProblemSection({ a, onSaved, notify }: { a: Assignment; onSa
           </div>
         </div>
       </div>
-      <Foot section="task" onSave={() => void save()} saved={saved} busy={saving} />
+      <Foot section="task" onSave={save} dirty={dirty} saved={saved} busy={saving} />
     </>
   )
 }
@@ -933,20 +978,23 @@ export function RulesSection({ a, onSaved, notify }: { a: Assignment; onSaved: (
 
   const edit = (i: number, patch: Partial<RuleRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)))
 
-  async function save() {
+  // 내용이 빈 규칙은 없는 것으로 본다. 저장할 때도 보내지 않는다.
+  const kept = rows.filter((r) => r.text.trim())
+  const dirty = JSON.stringify(kept) !== JSON.stringify(a.rules.map((r) => ({ target: r.target, text: r.text })))
+
+  async function save(): Promise<boolean> {
     setSaving(true)
     try {
-      // 내용이 빈 규칙은 보내지 않는다. 저장된 규칙으로 줄을 다시 맞춘다.
-      const out = await api.prof.setRules(
-        a.id,
-        rows.filter((r) => r.text.trim()),
-      )
+      // 저장된 규칙으로 줄을 다시 맞춘다.
+      const out = await api.prof.setRules(a.id, kept)
       setRows(out.map((r) => ({ target: r.target, text: r.text })))
       await onSaved()
       notify('ok', 'AI 응답 규칙을 저장했다.')
       flash()
+      return true
     } catch (e) {
       notify('error', messageOf(e, '저장 실패'))
+      return false
     } finally {
       setSaving(false)
     }
@@ -976,7 +1024,7 @@ export function RulesSection({ a, onSaved, notify }: { a: Assignment; onSaved: (
         <Plus aria-hidden="true" />
         규칙 추가
       </button>
-      <Foot section="rules" onSave={() => void save()} saved={saved} busy={saving} />
+      <Foot section="rules" onSave={save} dirty={dirty} saved={saved} busy={saving} />
     </>
   )
 }
@@ -995,13 +1043,19 @@ const ENV_STATE: Record<string, [string, 'done' | 'doing' | 'todo' | 'alert']> =
 
 const words = (text: string) => text.split(/[\s,]+/).filter(Boolean)
 
+// 서버에 저장된 설정을 입력 줄로 바꾼다.
+const fileRows = (files: Partial<FileRow>[] = []): FileRow[] => files.map((f) => ({ path: f.path ?? '', content: f.content ?? '', readonly: Boolean(f.readonly) }))
+const caseRows = (tests: Partial<CaseRow>[] = []): CaseRow[] => tests.map((t) => ({ name: t.name ?? '', stdin: t.stdin ?? '', expected: t.expected ?? '' }))
+// 서버에 보내는 모양. 이름이 없는 파일과 이름도 기대 출력도 없는 테스트는 뺀다.
+const keptFiles = (files: FileRow[]) => files.filter((f) => f.path.trim()).map((f) => ({ path: f.path.trim(), content: f.content, readonly: f.readonly }))
+const keptCases = (cases: CaseRow[]) => cases.filter((c) => c.name.trim() || c.expected.trim())
+const specKey = (x: EnvSpec | null) => (x ? JSON.stringify([x.preset, x.name, x.required, x.apt, x.pip, x.cflags]) : '')
+
 export function ToolSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a: Assignment) => void; notify: Notify }) {
   const cfg = a.tool_config as { files?: Partial<FileRow>[]; tests?: Partial<CaseRow>[] }
-  const [files, setFiles] = useState<FileRow[]>(
-    (cfg.files ?? []).map((f) => ({ path: f.path ?? '', content: f.content ?? '', readonly: Boolean(f.readonly) })),
-  )
+  const [files, setFiles] = useState<FileRow[]>(() => fileRows(cfg.files))
   const [open, setOpen] = useState(0)
-  const [cases, setCases] = useState<CaseRow[]>((cfg.tests ?? []).map((t) => ({ name: t.name ?? '', stdin: t.stdin ?? '', expected: t.expected ?? '' })))
+  const [cases, setCases] = useState<CaseRow[]>(() => caseRows(cfg.tests))
   const [env, setEnv] = useState<AssignmentEnv | null>(null)
   const [useEnv, setUseEnv] = useState(false)
   const [preset, setPreset] = useState('ubuntu-22.04')
@@ -1050,34 +1104,40 @@ export function ToolSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a
   const editFile = (i: number, patch: Partial<FileRow>) => setFiles((fs) => fs.map((f, j) => (j === i ? { ...f, ...patch } : f)))
   const editCase = (i: number, patch: Partial<CaseRow>) => setCases((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)))
 
-  async function save() {
-    const kept = files.filter((f) => f.path.trim())
-    const paths = kept.map((f) => f.path.trim())
-    if (kept.length === 0) return notify('error', '시작 파일이 하나 이상 있어야 한다.')
-    if (new Set(paths).size !== paths.length) return notify('error', '같은 이름의 파일이 있다.')
+  // 서버에 저장된 값과 다른지 본다. 환경은 서버에서 받아 온 뒤에만 견준다.
+  const kept = keptFiles(files)
+  const spec: EnvSpec | null = useEnv ? { preset, name: envName.trim(), required, apt: words(apt), pip: words(pip), cflags: cflags.trim() } : null
+  const dirty =
+    JSON.stringify(kept) !== JSON.stringify(keptFiles(fileRows(cfg.files))) ||
+    JSON.stringify(keptCases(cases)) !== JSON.stringify(keptCases(caseRows(cfg.tests))) ||
+    (env !== null && specKey(spec) !== specKey(env.spec))
+
+  async function save(): Promise<boolean> {
+    const paths = kept.map((f) => f.path)
+    if (kept.length === 0) {
+      notify('error', '시작 파일이 하나 이상 있어야 한다.')
+      return false
+    }
+    if (new Set(paths).size !== paths.length) {
+      notify('error', '같은 이름의 파일이 있다.')
+      return false
+    }
     setSaving(true)
     try {
       // 파일과 테스트를 먼저 저장하고 환경은 서버가 검사하는 전용 주소로 보낸다. 환경을 저장하면 서버가 이미지를 만들기 시작한다
       await api.prof.update(a.id, {
         tool_slot: 4,
         tool_name: 'workspace',
-        tool_config: {
-          ...a.tool_config,
-          files: kept.map((f) => ({ path: f.path.trim(), content: f.content, readonly: f.readonly })),
-          tests: cases.filter((c) => c.name.trim() || c.expected.trim()),
-        },
+        tool_config: { ...a.tool_config, files: kept, tests: keptCases(cases) },
       })
-      fill(
-        await api.prof.envSet(
-          a.id,
-          useEnv ? { preset, name: envName.trim(), required, apt: words(apt), pip: words(pip), cflags: cflags.trim() } : {},
-        ),
-      )
+      fill(await api.prof.envSet(a.id, spec ?? {}))
       onSaved(await api.prof.get(a.id))
       notify('ok', '도구 연동을 저장했다.')
       flash()
+      return true
     } catch (e) {
       notify('error', messageOf(e, '저장 실패'))
+      return false
     } finally {
       setSaving(false)
     }
@@ -1176,7 +1236,7 @@ export function ToolSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a
               </button>
             </div>
           ))}
-          {cases.length === 0 && <div className="empty">Python 과제는 test_ 로 시작하는 파일의 함수로 채점한다</div>}
+          {cases.length === 0 && <div className="empty">아직 테스트가 없다</div>}
         </div>
         <button type="button" className="btn after-rows" onClick={() => setCases((cs) => [...cs, { name: '', stdin: '', expected: '' }])}>
           <Plus aria-hidden="true" />
@@ -1270,7 +1330,7 @@ export function ToolSection({ a, onSaved, notify }: { a: Assignment; onSaved: (a
           )}
         </div>
       </Section>
-      <Foot section="tools" onSave={() => void save()} saved={saved} busy={saving} />
+      <Foot section="tools" onSave={save} dirty={dirty} saved={saved} busy={saving} />
     </>
   )
 }

@@ -785,16 +785,6 @@
   margin-left: auto;
 }
 
-.lp-notes-line {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 44px 20px 0;
-  font-size: 15px;
-  color: var(--lp-text-3);
-}
-
 /* 마지막 안내 */
 .lp-cta {
   padding: 176px 0 208px;
@@ -1005,11 +995,6 @@
     gap: 10px;
   }
 
-  .lp-notes-line {
-    display: block;
-    padding: 28px 0 0;
-  }
-
   .lp-cta {
     padding-top: 96px;
     padding-bottom: 120px;
@@ -1026,5 +1011,46 @@
 
   .lp-footer-note {
     display: block;
+  }
+}
+
+/* 휴대폰 폭에서 제품 그림 안의 코드가 잘리지 않게 글자를 줄이고 넘치면 옆으로 민다 */
+@media (max-width: 1000px) {
+  .lp-code {
+    font-size: 11px;
+    overflow-x: auto;
+  }
+
+  .lp-code span {
+    width: max-content;
+    min-width: 100%;
+    padding: 0 6px;
+  }
+
+  .lp-app-bar {
+    padding: 0 16px;
+  }
+
+  .lp-app-bar .end {
+    display: none;
+  }
+
+  .lp-act-row {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 30px;
+    row-gap: 0;
+  }
+
+  .lp-trow {
+    grid-template-columns: 1.1fr 1fr 0.6fr 0.6fr;
+  }
+
+  .lp-trow > :nth-child(5) {
+    display: none;
+  }
+
+  .lp-footer-brand {
+    grid-column: 1 / -1;
   }
 }

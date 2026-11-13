@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 
 import { api, TOOL_LABEL, type Assignment } from '../../../api'
-import { sectionDone, setupNav, STATUS_LABEL, STATUS_TONE } from '../../../nav'
+import { sectionDone, setupNav, shownStatus, STATUS_LABEL, STATUS_TONE } from '../../../nav'
 import { CopyButton, dateTime, Notice, Section, Status, type Tone } from '../../../ui'
 import { CompetenciesSection, MaterialsSection, RulesSection, TaskProblemSection, TestsSection, ToolSection } from '../setupSections'
 import { useSetup } from './SetupLayout'
@@ -141,7 +141,7 @@ export function PublishPage() {
           <div className="rows">
             <div className="row">
               <span className="name">상태</span>
-              <Status tone={STATUS_TONE[a.status]}>{STATUS_LABEL[a.status]}</Status>
+              <Status tone={STATUS_TONE[shownStatus(a)]}>{STATUS_LABEL[shownStatus(a)]}</Status>
             </div>
             <div className="row">
               <span className="name">과제 코드</span>

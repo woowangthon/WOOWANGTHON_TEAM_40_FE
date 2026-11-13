@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Editor, { DiffEditor, type BeforeMount, type OnMount } from '@monaco-editor/react'
+import Editor, { DiffEditor, loader, type BeforeMount, type OnMount } from '@monaco-editor/react'
 import { Check, Code2, FlaskConical, Lock, Play, Sparkles, X } from 'lucide-react'
+// 편집기는 외부 CDN 에서 받지 않고 이 화면 조각에 같이 묶는다. 작업공간이 쓰는 편집 기능과 세 언어만 가져온다.
+import * as monaco from 'monaco-editor/editor'
+import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
+import 'monaco-editor/features/register.all'
+import 'monaco-editor/languages/definitions/cpp/register'
+import 'monaco-editor/languages/definitions/java/register'
+import 'monaco-editor/languages/definitions/python/register'
 import { useTheme } from '../../../ui'
 import { applyProposal, type Proposal, type Selection, type WsFile } from './wsApi'
+
+// 비교 화면의 차이 계산은 편집기 워커가 맡는다. 워커도 같은 출처에서 받는다.
+self.MonacoEnvironment = { getWorker: () => new EditorWorker() }
+loader.config({ monaco })
 
 const LANG = {
   python: { badge: 'Py', name: 'Python 3.12', monaco: 'python' },
@@ -169,7 +180,6 @@ export function CodeEditor({
                   <button className="ws-btn sm" onClick={() => setDraft(null)}>
                     취소
                   </button>
-                  <small>직접 고쳐서 반영하면 ‘직접’ 커밋으로 기록되고 AI 원안도 함께 남아요.</small>
                 </>
               )}
             </div>

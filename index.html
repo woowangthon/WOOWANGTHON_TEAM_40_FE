@@ -2,18 +2,20 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/prob-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
     <title>prob.ai</title>
     <script>
       // 첫 화면이 깜빡이지 않도록 저장된 모드를 먼저 적용한다. 주소에 theme=light 또는 theme=dark 를 붙이면 그 모드로 연다.
+      // 고른 적이 없으면 기기 설정과 상관없이 다크 모드로 연다. 컴퓨터와 휴대폰에서 같은 모습으로 보이게 하기 위해서다.
       try {
         var asked = new URLSearchParams(location.search).get('theme')
-        var saved = asked === 'light' || asked === 'dark' ? asked : localStorage.getItem('theme')
-        var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+        var saved = asked === 'light' || asked === 'dark' ? asked : localStorage.getItem('prob-theme')
+        var dark = saved ? saved === 'dark' : true
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
       } catch (e) {
-        document.documentElement.dataset.theme = 'light'
+        document.documentElement.dataset.theme = 'dark'
       }
     </script>
   </head>

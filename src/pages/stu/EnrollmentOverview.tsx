@@ -134,7 +134,7 @@ export default function EnrollmentOverview() {
           <p className="prose">{a.description}</p>
         ) : (
           <div className="rows">
-            <div className="empty">교수가 과제 설명을 쓰지 않았다</div>
+            <div className="empty">과제 설명 미입력</div>
           </div>
         )}
         <Meta
@@ -189,7 +189,7 @@ export default function EnrollmentOverview() {
       </Section>
 
       {a.student_rules.length > 0 && (
-        <Section title="교수가 안내한 규칙">
+        <Section title="규칙">
           <div className="rows">
             {a.student_rules.map((r, i) => (
               <div className="row" key={i}>

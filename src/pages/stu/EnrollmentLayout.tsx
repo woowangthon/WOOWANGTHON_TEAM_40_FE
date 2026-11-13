@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { Check, ChevronLeft, Lock } from 'lucide-react'
 
 import { api, type Enrollment, type Stage } from '../../api'
+import ErrorBoundary from '../../components/ErrorBoundary'
 import { DownloadButton } from '../../components/Files'
 import { stageSteps } from '../../nav'
 import { Loading, monthDay, Notice, Status, ThemeToggle } from '../../ui'
@@ -17,13 +18,6 @@ export interface EnrollmentCtx {
 export function useEnrollment(): EnrollmentCtx {
   return useOutletContext<EnrollmentCtx>()
 }
-
-export const STAGE_ROUTES: { key: Stage; path: string; label: string }[] = [
-  { key: 'pre', path: 'pre', label: '1 사전평가' },
-  { key: 'learning', path: 'learning', label: '2 학습' },
-  { key: 'task', path: 'task', label: '3 과제' },
-  { key: 'post', path: 'post', label: '4 사후평가' },
-]
 
 const ORDER: Stage[] = ['pre', 'learning', 'task', 'post', 'done']
 
@@ -42,27 +36,8 @@ export default function EnrollmentLayout() {
   const enrollmentId = Number(eid)
   const [e, setE] = useState<Enrollment | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [params, setParams] = useSearchParams()
   const { pathname } = useLocation()
-  const googleParam = params.get('google')
-  const [notice, setNoticeText] = useState<string | null>(
-    googleParam === 'connected'
-      ? 'Google 계정을 연결했다. 과제 단계에서 문서 주소를 지정한다'
-      : googleParam === 'denied'
-        ? 'Google 계정 연결을 취소했다'
-        : googleParam === 'failed'
-          ? 'Google 계정 연결에 실패했다. 다시 시도한다'
-          : null,
-  )
-  const [noticeKind, setNoticeKind] = useState<'info' | 'error'>(googleParam === 'failed' ? 'error' : 'info')
-  useEffect(() => {
-    if (googleParam) setParams({}, { replace: true })
-  }, [googleParam, setParams])
-
-  const setNotice = useCallback((text: string | null) => {
-    setNoticeKind('info')
-    setNoticeText(text)
-  }, [])
+  const [notice, setNotice] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     const en = await api.stu.get(enrollmentId)
@@ -133,13 +108,14 @@ export default function EnrollmentLayout() {
 
       {notice && (
         <div className="stage-notice">
-          <Notice kind={noticeKind} onClose={() => setNotice(null)}>
-            {notice}
-          </Notice>
+          <Notice onClose={() => setNotice(null)}>{notice}</Notice>
         </div>
       )}
 
-      <Outlet context={ctx} />
+      {/* 단계 화면에서 예외가 나도 위쪽 바는 남기고, 다른 단계로 옮기면 오류 화면을 걷는다. */}
+      <ErrorBoundary resetKey={pathname}>
+        <Outlet context={ctx} />
+      </ErrorBoundary>
     </>
   )
 }

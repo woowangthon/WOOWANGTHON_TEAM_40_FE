@@ -1,13 +1,13 @@
 // 화면의 뼈대. 왼쪽 사이드바는 본문과 같은 계열에서 한 단계 어두운 면이고, 그 안의 메뉴는 지금 있는 곳에 따라 바뀐다.
-import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, NavLink, Outlet, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { createContext, Suspense, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, NavLink, Outlet, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { Archive, Check, ChevronLeft, CircleCheck, CirclePlay, CircleUser, Clock, Folder, Hash, Lock, LogOut, PencilLine, Send } from 'lucide-react'
 
 import { api, type Assignment, type Dashboard, type EnrollmentBrief } from './api'
 import { useAuth } from './auth'
 import ErrorBoundary from './components/ErrorBoundary'
-import { APP_NAME, sectionDone, setupNav, statusNav, type NavItem } from './nav'
+import { APP_NAME, sectionDone, setupNav, shownStatus, statusNav, type NavItem } from './nav'
 import { Loading, Logo, Notice, ThemeToggle } from './ui'
 
 const cls = ({ isActive }: { isActive: boolean }) => (isActive ? 'side-link active' : 'side-link')
@@ -44,10 +44,15 @@ function SideFoot({ children }: { children?: ReactNode }) {
   )
 }
 
+// 본문. 예외가 나도 사이드바는 남기고, 다른 메뉴로 옮기면 오류 화면을 걷는다.
+// 나누어 받는 화면 파일이 오는 동안에는 불러오는 중이라고 알린다.
 function Main({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
   return (
     <main className="main">
-      <ErrorBoundary>{children}</ErrorBoundary>
+      <ErrorBoundary resetKey={pathname}>
+        <Suspense fallback={<Loading />}>{children}</Suspense>
+      </ErrorBoundary>
     </main>
   )
 }
@@ -96,7 +101,8 @@ export function ProfHomeShell() {
 
   const rows = data?.rows ?? []
   const courses = [...new Set(rows.map((r) => r.subject).filter(Boolean))]
-  const byStatus = (s: string) => rows.filter((r) => r.status === s).length
+  // 공개한 과제는 마감 시각이 지나면 마감으로 센다.
+  const byStatus = (s: string) => rows.filter((r) => shownStatus(r) === s).length
 
   return (
     <div className="shell">
@@ -350,6 +356,7 @@ export function StuHomeShell() {
 // ---------- 로그인하지 않아도 보는 화면 ----------
 export function PublicFrame({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const { pathname } = useLocation()
   return (
     <div className="public">
       <header className="pub-top">
@@ -358,13 +365,13 @@ export function PublicFrame({ children }: { children: ReactNode }) {
           {APP_NAME}
         </Link>
         <div className="inline">
-          <Link className="btn quiet" to="/">
+          <Link className="btn quiet" to={user ? '/' : '/login'}>
             {user ? '내 화면으로' : '로그인'}
           </Link>
           <ThemeToggle />
         </div>
       </header>
-      <ErrorBoundary>{children}</ErrorBoundary>
+      <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
     </div>
   )
 }
